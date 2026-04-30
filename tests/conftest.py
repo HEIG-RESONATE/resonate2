@@ -8,42 +8,37 @@ import pytest
 from fastapi.testclient import TestClient
 
 
+@pytest.fixture(autouse=True)
+def setup_mongo():
+    """Use mongomock for all tests."""
+    import mongoengine
+
+    # Disconnect any existing connection
+    try:
+        mongoengine.disconnect()
+    except Exception:
+        pass
+
+    # Connect using mongomock
+    import mongomock
+
+    mongoengine.disconnect(alias="resonate")
+    mongoengine.connect(
+        "resonate",
+        host="localhost",
+        mongo_client_class=mongomock.MongoClient,
+        uuidRepresentation="pythonLegacy",
+    )
+
+    yield
+
+    # Cleanup
+    mongoengine.disconnect()
+
+
 @pytest.fixture
-def client(mocker) -> TestClient:
-    """Mock MongoDB and return test client."""
-    from unittest.mock import MagicMock
-    import types
-
-    # Create mock collection with proper setup
-    mock_collection = MagicMock()
-    mock_result = MagicMock()
-    mock_result.inserted_id = "mocked-id-123"
-    mock_collection.insert_one.return_value = mock_result
-
-    def find_side_effect(query):
-        if query.get("_id") == "mocked-id-123":
-            return {
-                "_id": "mocked-id-123",
-                "source": "x",
-                "text": "Hello from the farm!",
-                "coordinates": {"lat": 46.5, "lng": 7.0},
-            }
-        return None
-
-    mock_collection.find_one.side_effect = find_side_effect
-
-    # Create fake pymongo module
-    fake_pymongo = types.ModuleType("pymongo")
-    fake_mongo_client = MagicMock(return_value=MagicMock(documents=MagicMock(document=mock_collection)))
-    fake_pymongo.MongoClient = fake_mongo_client
-
-    # Patch pymongo before importing main
-    sys.modules["pymongo"] = fake_pymongo
-
-    # Now import main (it will use the mocked pymongo)
-    from main import app, get_db  # noqa: E402
-
-    # Also patch get_db to return our mock collection directly
-    mocker.patch("main.get_db", return_value=mock_collection)
+def client(setup_mongo) -> TestClient:
+    """Return test client with mocked MongoDB."""
+    from main import app
 
     return TestClient(app)
