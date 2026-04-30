@@ -18,5 +18,7 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Agents
+# Node / Vue
+frontend/node_modules/
+frontend/dist/
 AGENTS.md
