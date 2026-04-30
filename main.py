@@ -2,6 +2,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 import mongoengine
+from auth import create_access_token, verify_password, admin_password
 
 
 mongoengine.connect(
@@ -36,6 +37,22 @@ def get_db():
 
 
 app = FastAPI()
+
+
+class LoginRequest(BaseModel):
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+@app.post("/api/admin/login", response_model=TokenResponse)
+def admin_login(req: LoginRequest):
+    if not verify_password(req.password, admin_password.hash):
+        raise HTTPException(status_code=401, detail="Invalid password")
+    return TokenResponse(access_token=create_access_token())
 
 
 @app.get("/health")

@@ -1,4 +1,5 @@
 # Python / uv
+.env
 .venv/
 __pycache__/
 *.py[cod]
@@ -21,4 +22,5 @@ Thumbs.db
 # Node / Vue
 frontend/node_modules/
 frontend/dist/
-AGENTS.md
+frontend/.env
+frontend/.env.*.local
