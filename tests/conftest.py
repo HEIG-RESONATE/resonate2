@@ -39,6 +39,23 @@ def setup_mongo():
 @pytest.fixture
 def client(setup_mongo) -> TestClient:
     """Return test client with mocked MongoDB."""
+    import mongoengine
+
+    # Disconnect all before importing main (which connects at module level)
+    try:
+        mongoengine.disconnect()
+    except Exception:
+        pass
+
+    # Reconnect to mongomock for this test
+    import mongomock
+    mongoengine.connect(
+        "resonate",
+        host="localhost",
+        mongo_client_class=mongomock.MongoClient,
+        uuidRepresentation="pythonLegacy",
+    )
+
     from main import app
 
     return TestClient(app)
