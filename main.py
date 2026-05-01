@@ -134,6 +134,21 @@ def list_events(db=Depends(get_db), _=Depends(get_admin_token)):
     ]
 
 
+@app.get("/api/public/events", response_model=List[EventOut])
+def list_events_public(db=Depends(get_db)):
+    docs = db.objects().order_by('-date')
+    return [
+        EventOut(
+            id=str(doc.id),
+            title=doc.title,
+            date=doc.date.isoformat(),
+            points=_format_points(doc.points),
+            extra=doc.extra,
+        )
+        for doc in docs
+    ]
+
+
 @app.put("/api/events/{event_id}", response_model=EventOut)
 def update_event(event_id: str, event: EventCreate, db=Depends(get_db), _=Depends(get_admin_token)):
     doc = db.objects(id=event_id).first()
