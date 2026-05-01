@@ -1,33 +1,48 @@
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Union
 from datetime import datetime
 import mongoengine
+import os
+from auth import create_access_token, verify_password, admin_password, get_admin_token
 
+MONGO_HOST = os.environ.get("MONGO_HOST", "mongodb")
 
-def _connect():
-    """Connect to MongoDB only when first needed."""
-    if not mongoengine.connection.get_connection("resonate"):
-        mongoengine.connect(
-            "resonate",
-            uuidRepresentation="pythonLegacy",
-        )
-
-
-mongoengine.disconnect()  # Clear default connection set by conftest
+mongoengine.connect(
+    "resonate",
+    host=MONGO_HOST,
+    uuidRepresentation="pythonLegacy",
+)
 
 
 class EventOut(BaseModel):
     id: str
     title: str
     date: str
-    points: Optional[list] = None
+    points: Optional[Union[list, dict]] = None
 
 
 class EventCreate(BaseModel):
     title: str
     date: str
-    points: Optional[list] = None
+    points: Optional[Union[list, dict]] = None
+
+
+def _normalize_points(points) -> Optional[dict]:
+    if not points:
+        return None
+    if isinstance(points, list):
+        return {"type": "MultiPoint", "coordinates": points}
+    return points
+
+
+def _format_points(points) -> Optional[dict]:
+    if not points or not isinstance(points, dict):
+        return None
+    coords = points.get("coordinates")
+    if coords and isinstance(coords, list):
+        return {"type": "MultiPoint", "coordinates": coords}
+    return None
 
 
 class Event(mongoengine.Document):
@@ -37,9 +52,11 @@ class Event(mongoengine.Document):
 
     meta = {"collection": "events"}
 
+    def __str__(self):
+        return self.title
+
 
 def get_db():
-    _connect()
     return Event
 
 
@@ -62,18 +79,10 @@ def admin_login(req: LoginRequest):
     return TokenResponse(access_token=create_access_token())
 
 
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
-
-
-@app.post("/events", response_model=EventOut, status_code=201)
-def store_event(event: EventCreate, db=Depends(get_db)):
+@app.post("/api/events", response_model=EventOut, status_code=201)
+def store_event(event: EventCreate, db=Depends(get_db), _=Depends(get_admin_token)):
     parsed_date = datetime.fromisoformat(event.date)
-
-    points = event.points
-    if isinstance(points, list):
-        points = {"type": "MultiPoint", "coordinates": points}
+    points = _normalize_points(event.points)
 
     doc = db(
         title=event.title,
@@ -82,31 +91,67 @@ def store_event(event: EventCreate, db=Depends(get_db)):
     )
     doc.save()
 
-    pts = doc.points
-    if pts and isinstance(pts.get("coordinates"), list):
-        pts = {"type": "MultiPoint", "coordinates": pts["coordinates"]}
-
     return EventOut(
         id=str(doc.id),
         title=doc.title,
         date=doc.date.isoformat(),
-        points=pts,
+        points=_format_points(doc.points),
     )
 
 
-@app.get("/events/{event_id}", response_model=EventOut)
-def get_event(event_id: str, db=Depends(get_db)):
+@app.get("/api/events/{event_id}", response_model=EventOut)
+def get_event(event_id: str, db=Depends(get_db), _=Depends(get_admin_token)):
     doc = db.objects(id=event_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Not found")
 
-    pts = doc.points
-    if pts and isinstance(pts.get("coordinates"), list):
-        pts = {"type": "MultiPoint", "coordinates": pts["coordinates"]}
+    return EventOut(
+        id=str(doc.id),
+        title=doc.title,
+        date=doc.date.isoformat(),
+        points=_format_points(doc.points),
+    )
+
+
+@app.get("/api/events", response_model=List[EventOut])
+def list_events(db=Depends(get_db), _=Depends(get_admin_token)):
+    docs = db.objects().order_by('-date')
+    return [
+        EventOut(
+            id=str(doc.id),
+            title=doc.title,
+            date=doc.date.isoformat(),
+            points=_format_points(doc.points),
+        )
+        for doc in docs
+    ]
+
+
+@app.put("/api/events/{event_id}", response_model=EventOut)
+def update_event(event_id: str, event: EventCreate, db=Depends(get_db), _=Depends(get_admin_token)):
+    doc = db.objects(id=event_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    parsed_date = datetime.fromisoformat(event.date)
+    points = _normalize_points(event.points)
+
+    doc.title = event.title
+    doc.date = parsed_date
+    doc.points = points
+    doc.save()
 
     return EventOut(
         id=str(doc.id),
         title=doc.title,
         date=doc.date.isoformat(),
-        points=pts,
+        points=_format_points(doc.points),
     )
+
+
+@app.delete("/api/events/{event_id}", status_code=204)
+def delete_event(event_id: str, db=Depends(get_db), _=Depends(get_admin_token)):
+    doc = db.objects(id=event_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Not found")
+    doc.delete()

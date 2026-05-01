@@ -57,5 +57,18 @@ def client(setup_mongo) -> TestClient:
     )
 
     from main import app
+    from fastapi.testclient import TestClient
+    from auth import create_access_token
 
-    return TestClient(app)
+    class AuthClient(TestClient):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.token = create_access_token()
+
+        def request(self, *args, **kwargs):
+            headers = kwargs.get('headers') or {}
+            headers['Authorization'] = f'Bearer {self.token}'
+            kwargs['headers'] = headers
+            return super().request(*args, **kwargs)
+
+    return AuthClient(app)

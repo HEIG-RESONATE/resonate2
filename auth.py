@@ -27,7 +27,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def create_access_token() -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    return jwt.encode({"exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode({"sub": "admin", "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def get_admin_token(
