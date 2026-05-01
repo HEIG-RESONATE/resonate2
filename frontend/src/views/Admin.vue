@@ -34,6 +34,18 @@
           <span v-if="errors.points" class="error">{{ errors.points }}</span>
         </div>
 
+        <div class="form-group">
+          <label>Extra Fields</label>
+          <div class="extra-fields">
+            <div v-for="(field, i) in extraFields" :key="i" class="extra-field-row">
+              <input v-model="field.key" placeholder="Field name" />
+              <input v-model="field.value" placeholder="Value" />
+              <button type="button" class="btn-remove" @click="removeExtraField(i)">×</button>
+            </div>
+            <button type="button" class="btn-small" @click="addExtraField">+ Add field</button>
+          </div>
+        </div>
+
           <div class="form-actions">
             <button type="submit" class="btn-primary">{{ editing ? 'Update' : 'Add' }}</button>
             <button v-if="editing" type="button" class="btn-secondary" @click="cancelEdit">Cancel</button>
@@ -89,7 +101,7 @@
           </span>
         </div>
         <div class="modal-actions">
-          <button type="button" class="btn-secondary" @click="showMapPicker = false; pickerInitialCenter.value = null; pickerPoints.value = []">Cancel</button>
+          <button type="button" class="btn-secondary" @click="showMapPicker = false; pickerInitialCenter.value = null; pickerPoints.value = []; editingPoints.value = null">Cancel</button>
           <button type="button" class="btn-primary" @click="applyPoints">Apply</button>
         </div>
       </div>
@@ -123,7 +135,11 @@ const form = reactive({
   title: '',
   date: '',
   pointsStr: '',
+  extra: {},
 })
+
+const extraFields = ref([{ key: '', value: '' }])
+const editingPoints = ref(null)
 
 const errors = reactive({
   date: '',
@@ -189,9 +205,30 @@ function resetForm() {
   form.title = ''
   form.date = ''
   form.pointsStr = ''
+  form.extra = {}
   errors.date = ''
   errors.points = ''
   editing.value = null
+  extraFields.value = [{ key: '', value: '' }]
+}
+
+function addExtraField() {
+  extraFields.value.push({ key: '', value: '' })
+}
+
+function removeExtraField(i) {
+  extraFields.value.splice(i, 1)
+}
+
+function loadExtraFields(extra) {
+  if (extra && Object.keys(extra).length > 0) {
+    extraFields.value = Object.entries(extra).map(([key, value]) => ({
+      key,
+      value: String(value)
+    }))
+  } else {
+    extraFields.value = [{ key: '', value: '' }]
+  }
 }
 
 function editEvent(event) {
@@ -199,19 +236,19 @@ function editEvent(event) {
   form.title = event.title
   form.date = event.date.slice(0, 16)
   form.pointsStr = event.points?.coordinates?.map(c => c.join(',')).join(';') || ''
+  form.extra = event.extra || {}
+  loadExtraFields(event.extra)
 
-  // Open map picker with existing points
+  // Store points for map picker
   if (event.points && event.points.coordinates && event.points.coordinates.length > 0) {
-    pickerPoints.value = event.points.coordinates.map(c => [c[0], c[1]])
-    // Calculate center
-    const lats = pickerPoints.value.map(p => p[0])
-    const lngs = pickerPoints.value.map(p => p[1])
-    pickerInitialCenter.value = [
-      (Math.min(...lats) + Math.max(...lats)) / 2,
-      (Math.min(...lngs) + Math.max(...lngs)) / 2,
-    ]
-    showMapPicker.value = true
+    editingPoints.value = event.points.coordinates.map(c => [c[0], c[1]])
+  } else {
+    editingPoints.value = null
   }
+
+  // Reset map picker state
+  pickerInitialCenter.value = null
+  pickerPoints.value = []
 }
 
 async function saveEvent() {
@@ -221,10 +258,19 @@ async function saveEvent() {
     ? form.pointsStr.split(';').map(pair => pair.split(',').map(Number))
     : null
 
+  // Build extra fields object from form
+  const extra = {}
+  extraFields.value.forEach(f => {
+    if (f.key.trim()) {
+      extra[f.key.trim()] = f.value
+    }
+  })
+
   const payload = {
     title: form.title,
     date: new Date(form.date).toISOString(),
     points: points ? { type: 'MultiPoint', coordinates: points } : null,
+    extra: Object.keys(extra).length > 0 ? extra : null,
   }
 
   const url = editing.value
@@ -296,6 +342,11 @@ async function login() {
 let pickerMap = null
 
 function openMapPicker() {
+  // If no current points but editing, load from editingPoints
+  if (pickerPoints.value.length === 0 && editingPoints.value) {
+    pickerPoints.value = [...editingPoints.value]
+  }
+
   setTimeout(() => {
     const container = document.getElementById('picker-map')
     if (!container) return
@@ -366,6 +417,7 @@ function applyPoints() {
   showMapPicker.value = false
   pickerInitialCenter.value = null
   pickerPoints.value = []
+  editingPoints.value = null
 }
 
 watch(showMapPicker, (val) => {
@@ -488,6 +540,33 @@ body {
 
 .coords-row input {
   flex: 1;
+}
+
+.extra-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.extra-field-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.extra-field-row input {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.btn-remove {
+  background: var(--danger);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  width: 30px;
+  cursor: pointer;
 }
 
 .error {

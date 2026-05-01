@@ -20,12 +20,14 @@ class EventOut(BaseModel):
     title: str
     date: str
     points: Optional[Union[list, dict]] = None
+    extra: Optional[dict] = None
 
 
 class EventCreate(BaseModel):
     title: str
     date: str
     points: Optional[Union[list, dict]] = None
+    extra: Optional[dict] = None
 
 
 def _normalize_points(points) -> Optional[dict]:
@@ -49,6 +51,7 @@ class Event(mongoengine.Document):
     title = mongoengine.StringField(required=True)
     date = mongoengine.DateTimeField(required=True)
     points = mongoengine.DictField(null=True, blank=True)
+    extra = mongoengine.DictField(null=True, blank=True)
 
     meta = {"collection": "events"}
 
@@ -88,6 +91,7 @@ def store_event(event: EventCreate, db=Depends(get_db), _=Depends(get_admin_toke
         title=event.title,
         date=parsed_date,
         points=points,
+        extra=event.extra,
     )
     doc.save()
 
@@ -96,6 +100,7 @@ def store_event(event: EventCreate, db=Depends(get_db), _=Depends(get_admin_toke
         title=doc.title,
         date=doc.date.isoformat(),
         points=_format_points(doc.points),
+        extra=doc.extra,
     )
 
 
@@ -110,6 +115,7 @@ def get_event(event_id: str, db=Depends(get_db), _=Depends(get_admin_token)):
         title=doc.title,
         date=doc.date.isoformat(),
         points=_format_points(doc.points),
+        extra=doc.extra,
     )
 
 
@@ -122,6 +128,7 @@ def list_events(db=Depends(get_db), _=Depends(get_admin_token)):
             title=doc.title,
             date=doc.date.isoformat(),
             points=_format_points(doc.points),
+            extra=doc.extra,
         )
         for doc in docs
     ]
@@ -139,6 +146,7 @@ def update_event(event_id: str, event: EventCreate, db=Depends(get_db), _=Depend
     doc.title = event.title
     doc.date = parsed_date
     doc.points = points
+    doc.extra = event.extra
     doc.save()
 
     return EventOut(
@@ -146,6 +154,7 @@ def update_event(event_id: str, event: EventCreate, db=Depends(get_db), _=Depend
         title=doc.title,
         date=doc.date.isoformat(),
         points=_format_points(doc.points),
+        extra=doc.extra,
     )
 
 
