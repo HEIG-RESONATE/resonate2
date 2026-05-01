@@ -89,7 +89,7 @@
           </span>
         </div>
         <div class="modal-actions">
-          <button type="button" class="btn-secondary" @click="showMapPicker = false">Cancel</button>
+          <button type="button" class="btn-secondary" @click="showMapPicker = false; pickerInitialCenter.value = null; pickerPoints.value = []">Cancel</button>
           <button type="button" class="btn-primary" @click="applyPoints">Apply</button>
         </div>
       </div>
@@ -117,6 +117,7 @@ const events = ref([])
 const editing = ref(null)
 const showMapPicker = ref(false)
 const pickerPoints = ref([])
+const pickerInitialCenter = ref(null)
 
 const form = reactive({
   title: '',
@@ -198,6 +199,19 @@ function editEvent(event) {
   form.title = event.title
   form.date = event.date.slice(0, 16)
   form.pointsStr = event.points?.coordinates?.map(c => c.join(',')).join(';') || ''
+
+  // Open map picker with existing points
+  if (event.points && event.points.coordinates && event.points.coordinates.length > 0) {
+    pickerPoints.value = event.points.coordinates.map(c => [c[0], c[1]])
+    // Calculate center
+    const lats = pickerPoints.value.map(p => p[0])
+    const lngs = pickerPoints.value.map(p => p[1])
+    pickerInitialCenter.value = [
+      (Math.min(...lats) + Math.max(...lats)) / 2,
+      (Math.min(...lngs) + Math.max(...lngs)) / 2,
+    ]
+    showMapPicker.value = true
+  }
 }
 
 async function saveEvent() {
@@ -282,9 +296,6 @@ async function login() {
 let pickerMap = null
 
 function openMapPicker() {
-  pickerPoints.value = []
-
-  // Wait for DOM to update
   setTimeout(() => {
     const container = document.getElementById('picker-map')
     if (!container) return
@@ -295,19 +306,41 @@ function openMapPicker() {
       pickerMap = null
     }
 
-    pickerMap = L.map('picker-map', {
-      center: [46.5197, 7.0],
-      zoom: 8,
-    })
+    // Determine center and fit bounds
+    let center = [46.5197, 7.0]
+    let bounds = null
+
+    if (pickerPoints.value.length > 0) {
+      bounds = L.latLngBounds(pickerPoints.value)
+      center = bounds.getCenter()
+    } else if (pickerInitialCenter.value) {
+      center = pickerInitialCenter.value
+    }
+
+    pickerMap = L.map('picker-map', { center, zoom: 8 })
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '© OpenStreetMap',
     }).addTo(pickerMap)
 
+    // Add markers for existing points
+    pickerPoints.value.forEach((pt, i) => {
+      const marker = L.marker(pt).addTo(pickerMap)
+      marker.bindPopup(`Point ${i + 1}`)
+    })
+
+    // Fit bounds to show all markers
+    if (bounds && pickerPoints.value.length > 1) {
+      pickerMap.fitBounds(bounds, { padding: [50, 50] })
+    } else if (pickerPoints.value.length === 1) {
+      pickerMap.setZoom(12)
+    }
+
     pickerMap.on('click', function (e) {
       pickerPoints.value.push([e.latlng.lat, e.latlng.lng])
-      addMarker(e.latlng.lat, e.latlng.lng)
+      const marker = L.marker([e.latlng.lat, e.latlng.lng]).addTo(pickerMap)
+      marker.bindPopup(`Point ${pickerPoints.value.length}`)
     })
   }, 200)
 }
@@ -331,6 +364,8 @@ function applyPoints() {
   form.pointsStr = pickerPoints.value.map(pt => `${pt[0]},${pt[1]}`).join(';')
   validatePoints()
   showMapPicker.value = false
+  pickerInitialCenter.value = null
+  pickerPoints.value = []
 }
 
 watch(showMapPicker, (val) => {
