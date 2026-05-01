@@ -8,11 +8,12 @@ from auth import create_access_token, verify_password, admin_password, get_admin
 
 MONGO_HOST = os.environ.get("MONGO_HOST", "mongodb")
 
-mongoengine.connect(
-    "resonate",
-    host=MONGO_HOST,
-    uuidRepresentation="pythonLegacy",
-)
+if "default" not in mongoengine.connection._connections:
+    mongoengine.connect(
+        "resonate",
+        host=MONGO_HOST,
+        uuidRepresentation="pythonLegacy",
+    )
 
 
 class EventOut(BaseModel):

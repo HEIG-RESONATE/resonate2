@@ -9,14 +9,14 @@ def test_store_and_retrieve(client):
         "points": {"type": "MultiPoint", "coordinates": [[46.5197, 7.0], [46.52, 7.01]]},
     }
 
-    resp = client.post("/events", json=payload)
+    resp = client.post("/api/events", json=payload)
     assert resp.status_code == 201, f"Got {resp.status_code}: {resp.json()}"
     body = resp.json()
 
     event_id = body["id"]
     assert body["title"] == "Concert in the park"
 
-    resp = client.get(f"/events/{event_id}")
+    resp = client.get(f"/api/events/{event_id}")
     assert resp.status_code == 200
     body = resp.json()
     assert body["id"] == event_id
@@ -30,9 +30,9 @@ def test_list_events(client):
         "points": None,
     }
 
-    client.post("/events", json=payload)
+    client.post("/api/events", json=payload)
 
-    resp = client.get("/events")
+    resp = client.get("/api/events")
     assert resp.status_code == 200
     events = resp.json()
     assert len(events) >= 1
@@ -46,7 +46,7 @@ def test_update_event(client):
         "points": None,
     }
 
-    resp = client.post("/events", json=payload)
+    resp = client.post("/api/events", json=payload)
     event_id = resp.json()["id"]
 
     update_payload = {
@@ -55,7 +55,7 @@ def test_update_event(client):
         "points": {"type": "MultiPoint", "coordinates": [[46.5, 7.0]]},
     }
 
-    resp = client.put(f"/events/{event_id}", json=update_payload)
+    resp = client.put(f"/api/events/{event_id}", json=update_payload)
     assert resp.status_code == 200
     body = resp.json()
     assert body["title"] == "Updated Title"
@@ -69,11 +69,133 @@ def test_delete_event(client):
         "points": None,
     }
 
-    resp = client.post("/events", json=payload)
+    resp = client.post("/api/events", json=payload)
     event_id = resp.json()["id"]
 
-    resp = client.delete(f"/events/{event_id}")
+    resp = client.delete(f"/api/events/{event_id}")
     assert resp.status_code == 204
 
-    resp = client.get(f"/events/{event_id}")
+    resp = client.get(f"/api/events/{event_id}")
     assert resp.status_code == 404
+
+
+def test_create_event_with_extra_fields(client):
+    """Test creating an event with extra fields."""
+    payload = {
+        "title": "Event with Extras",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+        "extra": {"organizer": "John Doe", "capacity": "100"},
+    }
+
+    resp = client.post("/api/events", json=payload)
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["extra"]["organizer"] == "John Doe"
+    assert body["extra"]["capacity"] == "100"
+
+
+def test_update_event_extra_fields(client):
+    """Test updating extra fields on an event."""
+    payload = {
+        "title": "Original",
+        "date": "2026-07-15T19:00:00",
+        "extra": {"old": "value"},
+    }
+
+    resp = client.post("/api/events", json=payload)
+    event_id = resp.json()["id"]
+
+    update_payload = {
+        "title": "Updated",
+        "date": "2026-07-15T19:00:00",
+        "extra": {"new": "field", "another": "value"},
+    }
+
+    resp = client.put(f"/api/events/{event_id}", json=update_payload)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["extra"]["new"] == "field"
+    assert "old" not in body["extra"]
+
+
+def test_public_events_endpoint(client):
+    """Test public events endpoint without auth."""
+    payload = {
+        "title": "Public Event",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+    }
+
+    client.post("/api/events", json=payload)
+
+    resp = client.get("/api/public/events")
+    assert resp.status_code == 200
+    events = resp.json()
+    assert len(events) >= 1
+    assert any(e["title"] == "Public Event" for e in events)
+
+
+def test_public_events_with_extra_fields(client):
+    """Test public endpoint includes extra fields."""
+    payload = {
+        "title": "Special Event",
+        "date": "2026-07-15T19:00:00",
+        "extra": {"secret": "info"},
+    }
+
+    client.post("/api/events", json=payload)
+
+    resp = client.get("/api/public/events")
+    assert resp.status_code == 200
+    events = resp.json()
+    event = next(e for e in events if e["title"] == "Special Event")
+    assert event["extra"]["secret"] == "info"
+
+
+def test_admin_login(client):
+    """Test admin login endpoint."""
+    resp = client.post("/api/admin/login", json={"password": "admin"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "access_token" in body
+    assert body["token_type"] == "bearer"
+
+
+def test_admin_login_wrong_password(client):
+    """Test admin login with wrong password."""
+    resp = client.post("/api/admin/login", json={"password": "wrong"})
+    assert resp.status_code == 401
+
+
+def test_events_require_auth(client):
+    """Test that events endpoints require authentication."""
+    from fastapi.testclient import TestClient
+    from main import app
+
+    public_client = TestClient(app)
+
+    resp = public_client.get("/api/events")
+    assert resp.status_code == 401
+
+    resp = public_client.post("/api/events", json={
+        "title": "Test",
+        "date": "2026-07-15T19:00:00",
+    })
+    assert resp.status_code == 401
+
+
+def test_points_normalization_list(client):
+    """Test that points are stored as GeoJSON."""
+    payload = {
+        "title": "Point Test",
+        "date": "2026-07-15T19:00:00",
+        "points": [[46.5, 7.0], [46.6, 7.1]],
+    }
+
+    resp = client.post("/api/events", json=payload)
+    body = resp.json()
+
+    assert body["points"]["type"] == "MultiPoint"
+    assert body["points"]["coordinates"][0] == [46.5, 7.0]
+    assert body["points"]["coordinates"][1] == [46.6, 7.1]

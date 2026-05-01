@@ -41,11 +41,8 @@ def client(setup_mongo) -> TestClient:
     """Return test client with mocked MongoDB."""
     import mongoengine
 
-    # Disconnect all before importing main (which connects at module level)
-    try:
-        mongoengine.disconnect()
-    except Exception:
-        pass
+    # Disconnect ALL connections before importing main (which connects at module level)
+    mongoengine.disconnect_all()
 
     # Reconnect to mongomock for this test
     import mongomock
