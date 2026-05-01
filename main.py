@@ -1,4 +1,6 @@
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional, List, Union
 from datetime import datetime
@@ -22,6 +24,7 @@ class EventOut(BaseModel):
     date: str
     points: Optional[Union[list, dict]] = None
     extra: Optional[dict] = None
+    images: Optional[list] = None
 
 
 class EventCreate(BaseModel):
@@ -29,6 +32,14 @@ class EventCreate(BaseModel):
     date: str
     points: Optional[Union[list, dict]] = None
     extra: Optional[dict] = None
+    images: Optional[list] = None
+
+
+class EventImage(BaseModel):
+    filename: str
+    name: str
+    image_type: str = "optical"
+    tile_url: Optional[str] = None
 
 
 def _normalize_points(points) -> Optional[dict]:
@@ -53,6 +64,7 @@ class Event(mongoengine.Document):
     date = mongoengine.DateTimeField(required=True)
     points = mongoengine.DictField(null=True, blank=True)
     extra = mongoengine.DictField(null=True, blank=True)
+    images = mongoengine.ListField(null=True, blank=True)
 
     meta = {"collection": "events"}
 
@@ -93,6 +105,7 @@ def store_event(event: EventCreate, db=Depends(get_db), _=Depends(get_admin_toke
         date=parsed_date,
         points=points,
         extra=event.extra,
+        images=event.images or [],
     )
     doc.save()
 
@@ -102,6 +115,7 @@ def store_event(event: EventCreate, db=Depends(get_db), _=Depends(get_admin_toke
         date=doc.date.isoformat(),
         points=_format_points(doc.points),
         extra=doc.extra,
+        images=doc.images,
     )
 
 
@@ -117,6 +131,7 @@ def get_event(event_id: str, db=Depends(get_db), _=Depends(get_admin_token)):
         date=doc.date.isoformat(),
         points=_format_points(doc.points),
         extra=doc.extra,
+        images=doc.images,
     )
 
 
@@ -130,6 +145,7 @@ def list_events(db=Depends(get_db), _=Depends(get_admin_token)):
             date=doc.date.isoformat(),
             points=_format_points(doc.points),
             extra=doc.extra,
+            images=doc.images,
         )
         for doc in docs
     ]
@@ -145,6 +161,7 @@ def list_events_public(db=Depends(get_db)):
             date=doc.date.isoformat(),
             points=_format_points(doc.points),
             extra=doc.extra,
+            images=doc.images,
         )
         for doc in docs
     ]
@@ -163,6 +180,8 @@ def update_event(event_id: str, event: EventCreate, db=Depends(get_db), _=Depend
     doc.date = parsed_date
     doc.points = points
     doc.extra = event.extra
+    if event.images is not None:
+        doc.images = event.images
     doc.save()
 
     return EventOut(
@@ -171,6 +190,7 @@ def update_event(event_id: str, event: EventCreate, db=Depends(get_db), _=Depend
         date=doc.date.isoformat(),
         points=_format_points(doc.points),
         extra=doc.extra,
+        images=doc.images,
     )
 
 
@@ -180,3 +200,98 @@ def delete_event(event_id: str, db=Depends(get_db), _=Depends(get_admin_token)):
     if not doc:
         raise HTTPException(status_code=404, detail="Not found")
     doc.delete()
+
+
+IMAGES_DIR = os.environ.get("IMAGES_DIR", "/app/images")
+
+try:
+    if os.path.isdir(IMAGES_DIR):
+        app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="images")
+    else:
+        os.makedirs(IMAGES_DIR, exist_ok=True)
+        app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="images")
+except OSError:
+    pass  # May be read-only in tests
+
+
+@app.post("/api/events/{event_id}/images")
+async def upload_image(
+    event_id: str,
+    file: UploadFile = File(...),
+    name: str = Form(...),
+    image_type: str = Form("optical"),
+    db=Depends(get_db),
+    _=Depends(get_admin_token),
+):
+    doc = db.objects(id=event_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    filename = f"{event_id}_{datetime.now().timestamp()}_{file.filename}"
+    filepath = os.path.join(IMAGES_DIR, filename)
+
+    with open(filepath, "wb") as f:
+        content = await file.read()
+        f.write(content)
+
+    bounds = None
+    preview_filename = None
+    if filename.lower().endswith(('.tif', '.tiff')):
+        try:
+            import rasterio
+
+            with rasterio.open(filepath) as src:
+                bounds = list(src.bounds)
+
+                # Create a simple preview as PNG
+                preview_filename = filename.rsplit('.', 1)[0] + '_preview.png'
+                preview_path = os.path.join(IMAGES_DIR, preview_filename)
+
+                # Read bands and create a small preview
+                if src.count >= 3:
+                    data = src.read([1, 2, 3], out_shape=(3, 500, 500), resampling=rasterio.enums.Resampling.bilinear)
+                else:
+                    data = src.read(1, out_shape=(1, 500, 500), resampling=rasterio.enums.Resampling.bilinear)
+
+                # Write as PNG using rasterio's profile
+                with rasterio.open(
+                    preview_path, 'w',
+                    driver='PNG',
+                    width=data.shape[2],
+                    height=data.shape[1],
+                    count=data.shape[0],
+                    dtype=data.dtype
+                ) as dst:
+                    dst.write(data)
+
+                print(f"Created preview: {preview_filename}")
+
+        except Exception as e:
+            import traceback
+            print(f"Failed to extract bounds or create preview: {e}")
+            traceback.print_exc()
+            bounds = None
+            preview_filename = None
+
+    image_data = {
+        "filename": filename,
+        "name": name,
+        "image_type": image_type,
+        "bounds": bounds,
+        "preview": preview_filename,
+    }
+
+    if not doc.images:
+        doc.images = []
+    doc.images.append(image_data)
+    doc.save()
+
+    return {"status": "ok", "image": image_data}
+
+
+@app.get("/api/events/{event_id}/images")
+def get_event_images(event_id: str, db=Depends(get_db), _=Depends(get_admin_token)):
+    doc = db.objects(id=event_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return {"images": doc.images or []}

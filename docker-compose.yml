@@ -5,7 +5,12 @@ services:
       - "8000:8000"
     volumes:
       - .:/app
+      - images-data:/app/images
+    environment:
+      - MONGO_HOST=mongodb
     command: uvicorn main:app --host 0.0.0.0 --reload
+    depends_on:
+      - mongodb
 
   frontend:
     build: ./frontend
@@ -25,3 +30,4 @@ services:
 
 volumes:
   mongo-data:
+  images-data:

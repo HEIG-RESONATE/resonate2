@@ -27,6 +27,20 @@
               <span class="extra-value">{{ value }}</span>
             </div>
           </div>
+
+          <div v-if="selectedEvent.images && selectedEvent.images.length > 0" class="detail-images">
+            <span class="detail-label">Satellite Images</span>
+            <div v-for="img in selectedEvent.images" :key="img.filename" class="image-item">
+              <label class="toggle-label">
+                <input type="checkbox" v-model="showRaster[img.filename]" @change="toggleRaster(img)" />
+              </label>
+              <span class="image-name">{{ img.name }}</span>
+              <span class="image-type">({{ img.image_type }})</span>
+              <button v-if="img.bounds" class="image-badge" @click="zoomToImage(img.bounds)">
+                Zoom
+              </button>
+            </div>
+          </div>
         </div>
       </template>
 
@@ -62,6 +76,8 @@ const events = ref([])
 const loading = ref(true)
 const selectedEvent = ref(null)
 let map = null
+let imageOverlay = null
+const showRaster = ref({})
 
 onMounted(async () => {
   try {
@@ -101,12 +117,13 @@ function showAllMarkers() {
 function selectEvent(event) {
   selectedEvent.value = event
 
-  // Clear existing markers
+  // Clear existing markers and image overlay
   map.eachLayer(layer => {
     if (layer instanceof L.Marker) {
       map.removeLayer(layer)
     }
   })
+  clearImageOverlay()
 
   // Show only this event's markers
   if (event.points && event.points.coordinates) {
@@ -120,17 +137,28 @@ function selectEvent(event) {
 
     fitMapToCoords(coords)
   }
+
+  // Reset showRaster state for new event
+  showRaster.value = {}
+}
+
+function clearImageOverlay() {
+  if (imageOverlay) {
+    map.removeLayer(imageOverlay)
+    imageOverlay = null
+  }
 }
 
 function clearSelection() {
   selectedEvent.value = null
 
-  // Clear markers
+  // Clear markers and image overlay
   map.eachLayer(layer => {
     if (layer instanceof L.Marker) {
       map.removeLayer(layer)
     }
   })
+  clearImageOverlay()
 
   // Show all markers
   showAllMarkers()
@@ -144,6 +172,30 @@ function fitMapToCoords(coords) {
   } else {
     const bounds = L.latLngBounds(coords)
     map.fitBounds(bounds, { padding: [50, 50] })
+  }
+}
+
+function zoomToImage(bounds) {
+  const imageBounds = [[bounds[1], bounds[0]], [bounds[3], bounds[2]]]
+  map.fitBounds(imageBounds, { padding: [50, 50] })
+}
+
+function toggleRaster(img) {
+  if (!img.bounds || !img.preview) return
+
+  const baseUrl = window.location.origin
+  const imageUrl = `${baseUrl}/images/${img.preview}`
+  const bounds = img.bounds
+  const imageBounds = [[bounds[1], bounds[0]], [bounds[3], bounds[2]]]
+
+  // Clear existing overlay for this specific image
+  if (imageOverlay) {
+    map.removeLayer(imageOverlay)
+    imageOverlay = null
+  }
+
+  if (showRaster.value[img.filename]) {
+    imageOverlay = L.imageOverlay(imageUrl, imageBounds, { opacity: 0.7 }).addTo(map)
   }
 }
 
@@ -251,6 +303,64 @@ function formatDate(dateStr) {
 
 .extra-key {
   font-weight: 600;
+}
+
+.detail-images {
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.images-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.toggle-label input {
+  cursor: pointer;
+}
+
+.image-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.image-name {
+  font-weight: 500;
+}
+
+.image-type {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.875rem;
+}
+
+.image-badge {
+  margin-left: auto;
+  padding: 0.3rem 0.6rem;
+  background: #84a98c;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: white;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+}
+
+.image-badge:hover {
+  background: #6b8e73;
 }
 
 .loading, .empty {

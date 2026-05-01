@@ -46,6 +46,32 @@
           </div>
         </div>
 
+        <div v-if="editing && eventImages.length" class="form-group">
+          <label>Satellite Images</label>
+          <div class="image-list">
+            <div v-for="(img, i) in eventImages" :key="i" class="image-item">
+              <span>{{ img.name }} ({{ img.image_type }})</span>
+              <button type="button" class="btn-remove" @click="deleteImage(editing, img.filename)">Delete</button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="editing" class="form-group">
+          <label>Upload TIFF</label>
+          <div class="upload-form">
+            <input type="file" @change="e => uploadFile = e.target.files[0]" accept=".tif,.tiff" />
+            <input v-model="uploadName" placeholder="Image name (e.g., Before 2024)" />
+            <select v-model="uploadType">
+              <option value="optical">Optical</option>
+              <option value="sar">SAR</option>
+            </select>
+            <button type="button" class="btn-small" :disabled="uploading" @click="uploadImage(editing)">
+              {{ uploading ? 'Uploading...' : 'Upload' }}
+            </button>
+          </div>
+          <p v-if="uploadSuccess" class="success">Image uploaded successfully!</p>
+        </div>
+
           <div class="form-actions">
             <button type="submit" class="btn-primary">{{ editing ? 'Update' : 'Add' }}</button>
             <button v-if="editing" type="button" class="btn-secondary" @click="cancelEdit">Cancel</button>
@@ -140,6 +166,12 @@ const form = reactive({
 
 const extraFields = ref([{ key: '', value: '' }])
 const editingPoints = ref(null)
+const eventImages = ref([])
+const uploadFile = ref(null)
+const uploadName = ref('')
+const uploadType = ref('optical')
+const uploading = ref(false)
+const uploadSuccess = ref(false)
 
 const errors = reactive({
   date: '',
@@ -238,6 +270,7 @@ function editEvent(event) {
   form.pointsStr = event.points?.coordinates?.map(c => c.join(',')).join(';') || ''
   form.extra = event.extra || {}
   loadExtraFields(event.extra)
+  eventImages.value = event.images || []
 
   // Store points for map picker
   if (event.points && event.points.coordinates && event.points.coordinates.length > 0) {
@@ -292,8 +325,22 @@ async function saveEvent() {
     return
   }
 
-  resetForm()
-  await loadEvents()
+  const data = await res.json()
+
+  if (!editing.value) {
+    // Created new event - switch to edit mode with the new event
+    editing.value = data.id
+    eventImages.value = data.images || []
+    await loadEvents()
+    // Update the event in the list to get latest data
+    const event = events.value.find(e => e.id === data.id)
+    if (event) {
+      eventImages.value = event.images || []
+    }
+  } else {
+    resetForm()
+    await loadEvents()
+  }
 }
 
 async function deleteEvent(id) {
@@ -309,6 +356,84 @@ async function deleteEvent(id) {
   if (res.ok) {
     await loadEvents()
   } else {
+    error.value = 'Delete failed'
+  }
+}
+
+async function uploadImage(eventId) {
+  if (!uploadFile.value || !uploadName.value) return
+
+  uploading.value = true
+  uploadSuccess.value = false
+  const formData = new FormData()
+  formData.append('file', uploadFile.value)
+  formData.append('name', uploadName.value)
+  formData.append('image_type', uploadType.value)
+
+  try {
+    const res = await fetch(`/api/events/${eventId}/images`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${sessionStorage.getItem('adminToken')}`,
+      },
+      body: formData,
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      uploadFile.value = null
+      uploadName.value = ''
+      uploadType.value = 'optical'
+      uploadSuccess.value = true
+      setTimeout(() => { uploadSuccess.value = false }, 3000)
+      await loadEvents()
+      // Update eventImages with new data
+      const event = events.value.find(e => e.id === eventId)
+      if (event) {
+        eventImages.value = event.images || []
+      }
+    } else {
+      error.value = 'Upload failed'
+    }
+  } finally {
+    uploading.value = false
+  }
+}
+
+async function deleteImage(eventId, imageFilename) {
+  if (!confirm('Delete this image?')) return
+
+  const event = events.value.find(e => e.id === eventId)
+  if (!event || !event.images) return
+
+  const newImages = event.images.filter(img => img.filename !== imageFilename)
+
+  try {
+    const res = await fetch(`/api/events/${eventId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${sessionStorage.getItem('adminToken')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title: event.title,
+        date: event.date,
+        points: event.points,
+        extra: event.extra,
+        images: newImages,
+      }),
+    })
+
+    if (res.ok) {
+      await loadEvents()
+      const updatedEvent = events.value.find(e => e.id === eventId)
+      if (updatedEvent) {
+        eventImages.value = updatedEvent.images || []
+      }
+    } else {
+      error.value = 'Delete failed'
+    }
+  } catch (e) {
     error.value = 'Delete failed'
   }
 }
@@ -565,14 +690,75 @@ body {
   color: white;
   border: none;
   border-radius: var(--radius);
-  width: 30px;
+  padding: 0.4rem 0.8rem;
   cursor: pointer;
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 .error {
   color: var(--danger);
   font-size: 0.875rem;
   margin-top: 0.25rem;
+}
+
+.success {
+  color: #2c5f2d;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  font-weight: 600;
+  padding: 0.5rem;
+  background: #e8f5e9;
+  border-radius: var(--radius);
+  border: 1px solid #2c5f2d;
+}
+
+.image-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.image-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem;
+  background: var(--bg);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+}
+
+.image-item button {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.upload-form {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.upload-form input[type="file"] {
+  flex: 1;
+  min-width: 200px;
+}
+
+.upload-form input[type="text"] {
+  flex: 1;
+  min-width: 150px;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.upload-form select {
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 
 .form-actions {
