@@ -11,7 +11,11 @@ from fastapi.responses import JSONResponse
 import mongoengine
 import os
 import re
+import logging
+import filetype
 from auth import create_access_token, verify_password, admin_password, get_admin_token
+
+logger = logging.getLogger(__name__)
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -226,7 +230,7 @@ def delete_event(event_id: str, db=Depends(get_db), _=Depends(get_admin_token)):
 
 
 IMAGES_DIR = os.environ.get("IMAGES_DIR", "/app/images")
-ALLOWED_UPLOAD_TYPES = {"image/tiff", "image/png", "image/jpeg", "application/octet-stream"}
+ALLOWED_UPLOAD_TYPES = {"image/tiff", "image/png", "image/jpeg"}
 MAX_UPLOAD_MB = 50
 
 try:
@@ -252,12 +256,15 @@ async def upload_image(
     if not doc:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    if file.content_type and file.content_type not in ALLOWED_UPLOAD_TYPES:
-        raise HTTPException(status_code=400, detail=f"File type '{file.content_type}' not allowed. Accepted: {', '.join(ALLOWED_UPLOAD_TYPES)}")
-
     content = await file.read()
     if len(content) > MAX_UPLOAD_MB * 1024 * 1024:
         raise HTTPException(status_code=413, detail=f"File exceeds {MAX_UPLOAD_MB}MB limit")
+
+    kind = filetype.guess(content)
+    if kind is None:
+        raise HTTPException(status_code=400, detail="Unable to determine file type. Only PNG, JPEG, and TIFF are allowed.")
+    if kind.mime not in ALLOWED_UPLOAD_TYPES:
+        raise HTTPException(status_code=400, detail=f"File type '{kind.mime}' not allowed. Accepted: {', '.join(ALLOWED_UPLOAD_TYPES)}")
 
     safe_name = re.sub(r"[^\w\-.]", "_", file.filename or "upload.bin")
     images_dir = os.environ.get("IMAGES_DIR", IMAGES_DIR)
@@ -298,12 +305,10 @@ async def upload_image(
                 ) as dst:
                     dst.write(data)
 
-                print(f"Created preview: {preview_filename}")
+                logger.info("Created preview: %s", preview_filename)
 
         except Exception as e:
-            import traceback
-            print(f"Failed to extract bounds or create preview: {e}")
-            traceback.print_exc()
+            logger.warning("Failed to extract bounds or create preview", exc_info=True)
             bounds = None
             preview_filename = None
 

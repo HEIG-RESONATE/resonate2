@@ -293,3 +293,21 @@ def test_extra_field_size_limit(client):
         "extra": large_extra,
     })
     assert resp.status_code == 422
+
+
+def test_upload_rejects_magic_byte_mismatch(client):
+    """Test that upload rejects file where magic bytes don't match Content-Type."""
+    resp = client.post("/api/events", json={
+        "title": "Magic Test",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+    })
+    event_id = resp.json()["id"]
+
+    resp = client.post(
+        f"/api/events/{event_id}/images",
+        files={"file": ("fake.png", b"NOT_A_REAL_PNG_FILE", "image/png")},
+        data={"name": "fake", "image_type": "optical"},
+    )
+    assert resp.status_code == 400
+    assert "not allowed" in resp.json()["detail"] or "Unable to determine" in resp.json()["detail"]
