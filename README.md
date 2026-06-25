@@ -2,22 +2,6 @@
 
 A map-based event management application with satellite imagery support. Built with FastAPI, MongoDB, and Vue.js.
 
-## Architecture Overview
-
-![Architecture Diagram](docs/diagrams/architecture.svg)
-
-## Component Diagram
-
-![Component Diagram](docs/diagrams/components.svg)
-
-## Authentication Flow
-
-![Auth Flow](docs/diagrams/auth-flow.svg)
-
-## Image Upload Flow
-
-![Upload Flow](docs/diagrams/upload-flow.svg)
-
 ## Getting Started
 
 ### Prerequisites
@@ -30,7 +14,7 @@ A map-based event management application with satellite imagery support. Built w
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone git@github.com:SimWalther/resonate2.git
 cd resonate2
 
 # Install Python dependencies
@@ -68,6 +52,22 @@ uv run uvicorn main:app --reload
 # Terminal 2: Frontend
 cd frontend && npm run dev
 ```
+
+## Architecture Overview
+
+![Architecture Diagram](docs/diagrams/architecture.svg)
+
+## Component Diagram
+
+![Component Diagram](docs/diagrams/components.svg)
+
+## Authentication Flow
+
+![Auth Flow](docs/diagrams/auth-flow.svg)
+
+## Image Upload Flow
+
+![Upload Flow](docs/diagrams/upload-flow.svg)
 
 ## API Documentation
 
