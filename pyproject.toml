@@ -29,3 +29,8 @@ test = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "plantuml>=0.3.0",
+]
