@@ -6,6 +6,7 @@ from typing import Optional, List, Union
 from datetime import datetime
 import mongoengine
 import os
+import re
 from auth import create_access_token, verify_password, admin_password, get_admin_token
 
 MONGO_HOST = os.environ.get("MONGO_HOST", "mongodb")
@@ -203,6 +204,8 @@ def delete_event(event_id: str, db=Depends(get_db), _=Depends(get_admin_token)):
 
 
 IMAGES_DIR = os.environ.get("IMAGES_DIR", "/app/images")
+ALLOWED_UPLOAD_TYPES = {"image/tiff", "image/png", "image/jpeg", "application/octet-stream"}
+MAX_UPLOAD_MB = 50
 
 try:
     if os.path.isdir(IMAGES_DIR):
@@ -227,11 +230,20 @@ async def upload_image(
     if not doc:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    filename = f"{event_id}_{datetime.now().timestamp()}_{file.filename}"
-    filepath = os.path.join(IMAGES_DIR, filename)
+    if file.content_type and file.content_type not in ALLOWED_UPLOAD_TYPES:
+        raise HTTPException(status_code=400, detail=f"File type '{file.content_type}' not allowed. Accepted: {', '.join(ALLOWED_UPLOAD_TYPES)}")
+
+    content = await file.read()
+    if len(content) > MAX_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"File exceeds {MAX_UPLOAD_MB}MB limit")
+
+    safe_name = re.sub(r"[^\w\-.]", "_", file.filename or "upload.bin")
+    images_dir = os.environ.get("IMAGES_DIR", IMAGES_DIR)
+    filename = f"{event_id}_{datetime.now().timestamp()}_{safe_name}"
+    filepath = os.path.join(images_dir, os.path.basename(filename))
+    os.makedirs(images_dir, exist_ok=True)
 
     with open(filepath, "wb") as f:
-        content = await file.read()
         f.write(content)
 
     bounds = None
@@ -245,7 +257,7 @@ async def upload_image(
 
                 # Create a simple preview as PNG
                 preview_filename = filename.rsplit('.', 1)[0] + '_preview.png'
-                preview_path = os.path.join(IMAGES_DIR, preview_filename)
+                preview_path = os.path.join(images_dir, preview_filename)
 
                 # Read bands and create a small preview
                 if src.count >= 3:

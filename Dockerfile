@@ -6,7 +6,7 @@ RUN pip install uv
 
 WORKDIR /app
 
-COPY pyproject.toml .python-version .env ./
+COPY pyproject.toml .python-version ./
 
 RUN uv sync && uv pip install --system -e .
 

@@ -6,8 +6,10 @@ services:
     volumes:
       - .:/app
       - images-data:/app/images
+    env_file:
+      - .env
     environment:
-      - MONGO_HOST=mongodb
+      - MONGO_HOST=mongodb://resonate:${MONGO_PASSWORD}@mongodb:27017/resonate?authSource=admin
     command: uvicorn main:app --host 0.0.0.0 --reload
     depends_on:
       - mongodb
@@ -23,8 +25,9 @@ services:
 
   mongodb:
     image: mongo:7.0
-    ports:
-      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: resonate
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
     volumes:
       - mongo-data:/data/db
 

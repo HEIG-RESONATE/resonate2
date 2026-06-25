@@ -29,7 +29,8 @@
 ```
 ADMIN_PASSWORD=<set-strong-password>
 ADMIN_SECRET_KEY=<random-hex-string>
-MONGO_HOST=mongodb
+MONGO_PASSWORD=<set-strong-password>
+MONGO_HOST=mongodb://resonate:${MONGO_PASSWORD}@mongodb:27017/resonate?authSource=admin
 ```
 
 ## Architecture

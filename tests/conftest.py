@@ -1,4 +1,6 @@
 import sys
+import os
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -34,6 +36,14 @@ def setup_mongo():
 
     # Cleanup
     mongoengine.disconnect()
+
+
+@pytest.fixture(autouse=True)
+def set_images_dir(tmp_path):
+    """Use a temp directory for image uploads during tests."""
+    os.environ["IMAGES_DIR"] = str(tmp_path / "images")
+    yield
+    os.environ.pop("IMAGES_DIR", None)
 
 
 @pytest.fixture

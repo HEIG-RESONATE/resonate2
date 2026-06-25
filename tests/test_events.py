@@ -199,3 +199,61 @@ def test_points_normalization_list(client):
     assert body["points"]["type"] == "MultiPoint"
     assert body["points"]["coordinates"][0] == [46.5, 7.0]
     assert body["points"]["coordinates"][1] == [46.6, 7.1]
+
+
+def test_upload_rejects_invalid_content_type(client):
+    """Test that upload rejects files with disallowed content types."""
+    resp = client.post("/api/events", json={
+        "title": "Upload Test",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+    })
+    event_id = resp.json()["id"]
+
+    resp = client.post(
+        f"/api/events/{event_id}/images",
+        files={"file": ("evil.exe", b"MZ\x90\x00", "application/x-msdownload")},
+        data={"name": "malware", "image_type": "optical"},
+    )
+    assert resp.status_code == 400
+    assert "not allowed" in resp.json()["detail"]
+
+
+def test_upload_rejects_oversized_file(client):
+    """Test that upload rejects files exceeding the size limit."""
+    resp = client.post("/api/events", json={
+        "title": "Upload Size Test",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+    })
+    event_id = resp.json()["id"]
+
+    large_content = b"x" * (50 * 1024 * 1024 + 1)  # 50MB + 1 byte
+    resp = client.post(
+        f"/api/events/{event_id}/images",
+        files={"file": ("big.tif", large_content, "image/tiff")},
+        data={"name": "big image", "image_type": "optical"},
+    )
+    assert resp.status_code == 413
+    assert "exceeds" in resp.json()["detail"]
+
+
+def test_upload_accepts_valid_png(client):
+    """Test that upload accepts a valid PNG file."""
+    resp = client.post("/api/events", json={
+        "title": "PNG Upload Test",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+    })
+    event_id = resp.json()["id"]
+
+    png_content = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
+    resp = client.post(
+        f"/api/events/{event_id}/images",
+        files={"file": ("test.png", png_content, "image/png")},
+        data={"name": "test image", "image_type": "optical"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert body["image"]["filename"].endswith("_test.png")
