@@ -10,17 +10,20 @@
         </button>
         <button class="timeline-btn" @click="nextEvent">Next →</button>
       </div>
-      <div class="timeline-dates">
-        <button
-          v-for="(event, index) in events"
-          :key="event.id"
-          class="timeline-item"
-          :class="{ active: selectedEvent?.id === event.id }"
-          @click="selectEventByIndex(index)"
-        >
-          <span class="timeline-date">{{ formatTimelineDate(event.date) }}</span>
-          <span class="timeline-title">{{ event.title }}</span>
-        </button>
+      <div class="timeline-track">
+        <div class="timeline-dates">
+          <button
+            v-for="(event, index) in events"
+            :key="event.id"
+            class="timeline-item"
+            :class="{ active: selectedEvent?.id === event.id }"
+            @click="selectEventByIndex(index)"
+          >
+            <span class="timeline-dot"></span>
+            <span class="timeline-date">{{ formatTimelineDate(event.date) }}</span>
+            <span class="timeline-title">{{ event.title }}</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -54,8 +57,9 @@
           <div v-if="selectedEvent.images && selectedEvent.images.length > 0" class="detail-images">
             <span class="detail-label">Satellite Images</span>
             <div v-for="img in selectedEvent.images" :key="img.filename" class="image-item">
-              <label class="toggle-label">
+              <label class="toggle-switch">
                 <input type="checkbox" v-model="showRaster[img.filename]" @change="toggleRaster(img)" />
+                <span class="toggle-slider"></span>
               </label>
               <span class="image-name">{{ img.name }}</span>
               <span class="image-type">({{ img.image_type }})</span>
@@ -109,7 +113,8 @@ let playInterval = null
 onMounted(async () => {
   try {
     const res = await fetch('/api/public/events')
-    events.value = await res.json()
+    const data = await res.json()
+    events.value = data.sort((a, b) => new Date(a.date) - new Date(b.date))
   } catch (e) {
     console.error('Failed to load events:', e)
   }
@@ -325,16 +330,24 @@ function formatTimelineDate(dateStr) {
 }
 </script>
 
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+</style>
+
 <style scoped>
 .timeline {
   position: absolute;
-  bottom: 30px;
-  left: 50%;
+  bottom: 20px;
+  left: calc(50% - 160px);
   transform: translateX(-50%);
   z-index: 1000;
   background: white;
   border-radius: 12px;
-  padding: 1rem;
+  padding: 0.75rem 1rem;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   max-width: 90vw;
   width: 600px;
@@ -343,8 +356,8 @@ function formatTimelineDate(dateStr) {
 .timeline-controls {
   display: flex;
   justify-content: center;
-  gap: 1rem;
-  margin-bottom: 0.75rem;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .timeline-btn {
@@ -362,19 +375,23 @@ function formatTimelineDate(dateStr) {
 }
 
 .play-btn {
-  background: #84a98c;
+  background: #2d5a3f;
   color: white;
-  border-color: #84a98c;
+  border-color: #2d5a3f;
   min-width: 80px;
 }
 
 .play-btn:hover {
-  background: #6b8e73;
+  background: #1e3d2a;
+}
+
+.timeline-track {
+  position: relative;
 }
 
 .timeline-dates {
   display: flex;
-  gap: 0.5rem;
+  gap: 0;
   overflow-x: auto;
   padding-bottom: 0.25rem;
 }
@@ -382,24 +399,69 @@ function formatTimelineDate(dateStr) {
 .timeline-item {
   flex-shrink: 0;
   padding: 0.5rem 0.75rem;
-  border: 1px solid #ddd;
+  padding-top: 1.5rem;
+  border: none;
   border-radius: 8px;
   background: white;
   cursor: pointer;
   text-align: center;
   min-width: 100px;
   transition: all 0.2s;
+  position: relative;
+}
+
+.timeline-item:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 12px;
+  right: 0;
+  width: 50%;
+  height: 2px;
+  background: #ddd;
+  z-index: 0;
+}
+
+.timeline-item:not(:first-child)::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  left: 0;
+  width: 50%;
+  height: 2px;
+  background: #ddd;
+  z-index: 0;
+}
+
+.timeline-dot {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 12px;
+  background: #ddd;
+  border-radius: 50%;
+  border: 2px solid white;
+  z-index: 1;
+  transition: all 0.2s;
 }
 
 .timeline-item:hover {
-  border-color: #84a98c;
-  background: #f8fdf8;
+  background: #f0f7f2;
+}
+
+.timeline-item:hover .timeline-dot {
+  background: #2d5a3f;
 }
 
 .timeline-item.active {
-  background: #84a98c;
+  background: #2d5a3f;
   color: white;
-  border-color: #84a98c;
+}
+
+.timeline-item.active .timeline-dot {
+  background: #4ade80;
+  border-color: #2d5a3f;
 }
 
 .timeline-date {
@@ -415,13 +477,14 @@ function formatTimelineDate(dateStr) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 80px;
+  max-width: 120px;
 }
 
 .home {
   display: flex;
   height: 100vh;
   width: 100%;
+  position: relative;
 }
 
 #map {
@@ -431,7 +494,7 @@ function formatTimelineDate(dateStr) {
 
 .sidebar {
   width: 320px;
-  background-color: #84a98c;
+  background-color: #2d5a3f;
   color: white;
   padding: 1.5rem;
   overflow-y: auto;
@@ -444,7 +507,7 @@ function formatTimelineDate(dateStr) {
   font-weight: 700;
   margin-bottom: 1.5rem;
   padding-bottom: 1rem;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.5);
 }
 
 .back-btn {
@@ -469,7 +532,7 @@ function formatTimelineDate(dateStr) {
   font-weight: 700;
   margin-bottom: 1.5rem;
   padding-bottom: 1rem;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.5);
 }
 
 .event-detail {
@@ -487,7 +550,7 @@ function formatTimelineDate(dateStr) {
 .detail-label {
   font-size: 0.75rem;
   text-transform: uppercase;
-  opacity: 0.7;
+  opacity: 0.9;
   font-weight: 600;
 }
 
@@ -498,7 +561,7 @@ function formatTimelineDate(dateStr) {
 .detail-extra {
   margin-top: 0.5rem;
   padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.4);
 }
 
 .extra-item {
@@ -514,7 +577,7 @@ function formatTimelineDate(dateStr) {
 .detail-images {
   margin-top: 0.5rem;
   padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.4);
 }
 
 .images-header {
@@ -524,17 +587,50 @@ function formatTimelineDate(dateStr) {
   margin-bottom: 0.5rem;
 }
 
-.toggle-label {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: 0.75rem;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.8);
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
 }
 
-.toggle-label input {
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
   cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.3);
+  transition: 0.3s;
+  border-radius: 20px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: #4ade80;
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(16px);
 }
 
 .image-item {
@@ -549,14 +645,14 @@ function formatTimelineDate(dateStr) {
 }
 
 .image-type {
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.85);
   font-size: 0.875rem;
 }
 
 .image-badge {
   margin-left: auto;
   padding: 0.3rem 0.6rem;
-  background: #84a98c;
+  background: #2d5a3f;
   border-radius: 4px;
   font-size: 0.75rem;
   color: white;
@@ -566,13 +662,13 @@ function formatTimelineDate(dateStr) {
 }
 
 .image-badge:hover {
-  background: #6b8e73;
+  background: #1e3d2a;
 }
 
 .loading, .empty {
   text-align: center;
   padding: 2rem;
-  opacity: 0.8;
+  opacity: 0.9;
 }
 
 .event-list {
@@ -583,7 +679,7 @@ function formatTimelineDate(dateStr) {
 
 .event-item {
   padding: 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
   transition: background 0.2s;
   cursor: pointer;
 }
@@ -602,6 +698,6 @@ function formatTimelineDate(dateStr) {
 .event-date {
   display: block;
   font-size: 0.8rem;
-  opacity: 0.8;
+  opacity: 0.9;
 }
 </style>

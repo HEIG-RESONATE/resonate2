@@ -559,8 +559,8 @@ watch(showMapPicker, (val) => {
 
 <style>
 :root {
-  --primary: #2c5f2d;
-  --primary-hover: #1e4220;
+  --primary: #2d5a3f;
+  --primary-hover: #1e3d2a;
   --secondary: #6c757d;
   --danger: #dc3545;
   --bg: #f8f9fa;
@@ -579,7 +579,7 @@ watch(showMapPicker, (val) => {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Lexend', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: var(--bg);
   color: var(--text);
   line-height: 1.5;
