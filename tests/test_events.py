@@ -311,3 +311,154 @@ def test_upload_rejects_magic_byte_mismatch(client):
     )
     assert resp.status_code == 400
     assert "not allowed" in resp.json()["detail"] or "Unable to determine" in resp.json()["detail"]
+
+
+def test_get_event_images(client):
+    """Test retrieving images for an event."""
+    resp = client.post("/api/events", json={
+        "title": "Images Test",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+    })
+    event_id = resp.json()["id"]
+
+    png_content = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
+    client.post(
+        f"/api/events/{event_id}/images",
+        files={"file": ("test.png", png_content, "image/png")},
+        data={"name": "test image", "image_type": "optical"},
+    )
+
+    resp = client.get(f"/api/events/{event_id}/images")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "images" in body
+    assert len(body["images"]) == 1
+    assert body["images"][0]["name"] == "test image"
+
+
+def test_get_event_images_not_found(client):
+    """Test that get_event_images returns 404 for non-existent event."""
+    resp = client.get("/api/events/000000000000000000000000/images")
+    assert resp.status_code == 404
+
+
+def test_format_points_returns_none_for_empty(client):
+    """Test that empty points are normalized to None."""
+    payload = {
+        "title": "Empty Points",
+        "date": "2026-07-15T19:00:00",
+        "points": {},
+    }
+
+    resp = client.post("/api/events", json=payload)
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["points"] is None
+
+
+def test_format_points_returns_none_for_invalid_dict(client):
+    """Test that points dict without coordinates returns None."""
+    payload = {
+        "title": "Invalid Dict Points",
+        "date": "2026-07-15T19:00:00",
+        "points": {"type": "MultiPoint"},
+    }
+
+    resp = client.post("/api/events", json=payload)
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["points"] is None
+
+
+def test_update_event_with_images(client):
+    """Test updating an event's images field."""
+    resp = client.post("/api/events", json={
+        "title": "Update Images Test",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+    })
+    event_id = resp.json()["id"]
+
+    update_payload = {
+        "title": "Updated with Images",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+        "images": [{"filename": "test.tif", "name": "test", "image_type": "optical"}],
+    }
+
+    resp = client.put(f"/api/events/{event_id}", json=update_payload)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["images"] is not None
+    assert len(body["images"]) == 1
+
+
+def test_invalid_token_rejected(client):
+    """Test that invalid JWT tokens are rejected."""
+    from fastapi.testclient import TestClient as PlainTestClient
+    from main import app
+
+    plain_client = PlainTestClient(app)
+    resp = plain_client.get("/api/events", headers={"Authorization": "Bearer invalid_token"})
+    assert resp.status_code == 401
+
+
+def test_upload_to_nonexistent_event(client):
+    """Test that upload to non-existent event returns 404."""
+    resp = client.post(
+        "/api/events/000000000000000000000000/images",
+        files={"file": ("test.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 100, "image/png")},
+        data={"name": "test", "image_type": "optical"},
+    )
+    assert resp.status_code == 404
+
+
+def test_upload_tif_with_bounds(client):
+    """Test that TIF upload extracts bounds and creates preview."""
+    import rasterio
+    import numpy as np
+    import tempfile
+    import os
+
+    resp = client.post("/api/events", json={
+        "title": "TIF Test",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+    })
+    event_id = resp.json()["id"]
+
+    with tempfile.NamedTemporaryFile(suffix=".tif", delete=False) as tmp:
+        tmp_path = tmp.name
+        try:
+            with rasterio.open(
+                tmp_path,
+                "w",
+                driver="GTiff",
+                height=100,
+                width=100,
+                count=3,
+                dtype=np.uint8,
+                crs="EPSG:4326",
+                transform=rasterio.transform.from_bounds(6.0, 46.0, 8.0, 47.0, 100, 100),
+            ) as dst:
+                data = np.random.randint(0, 255, (3, 100, 100), dtype=np.uint8)
+                dst.write(data)
+
+            with open(tmp_path, "rb") as f:
+                tif_content = f.read()
+
+            resp = client.post(
+                f"/api/events/{event_id}/images",
+                files={"file": ("test.tif", tif_content, "image/tiff")},
+                data={"name": "satellite image", "image_type": "optical"},
+            )
+            assert resp.status_code == 200
+            body = resp.json()
+            assert body["status"] == "ok"
+            assert body["image"]["bounds"] is not None
+            assert len(body["image"]["bounds"]) == 4
+            assert body["image"]["preview"] is not None
+
+        finally:
+            os.unlink(tmp_path)
