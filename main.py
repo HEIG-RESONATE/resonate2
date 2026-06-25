@@ -1,8 +1,9 @@
 from fastapi import Depends, FastAPI, HTTPException, UploadFile, File, Form, Request
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, List, Union
 from datetime import datetime
+import json
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -39,6 +40,13 @@ class EventCreate(BaseModel):
     points: Optional[Union[list, dict]] = None
     extra: Optional[dict] = None
     images: Optional[list] = None
+
+    @field_validator("extra")
+    @classmethod
+    def validate_extra_size(cls, v):
+        if v is not None and len(json.dumps(v)) > 65536:
+            raise ValueError("extra field exceeds 64KB limit")
+        return v
 
 
 class EventImage(BaseModel):

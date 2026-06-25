@@ -282,3 +282,14 @@ def test_token_revocation(client):
     plain_client = PlainTestClient(app)
     resp = plain_client.get("/api/events", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 401
+
+
+def test_extra_field_size_limit(client):
+    """Test that extra field rejects payloads over 64KB."""
+    large_extra = {"data": "x" * 65537}
+    resp = client.post("/api/events", json={
+        "title": "Big Extra",
+        "date": "2026-07-15T19:00:00",
+        "extra": large_extra,
+    })
+    assert resp.status_code == 422
