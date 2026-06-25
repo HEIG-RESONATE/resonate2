@@ -267,3 +267,18 @@ def test_login_rate_limit(client):
 
     resp = client.post("/api/admin/login", json={"password": "wrong"})
     assert resp.status_code == 429
+
+
+def test_token_revocation(client):
+    """Test that revoked tokens are rejected."""
+    from auth import create_access_token, revoke_token, jwt, SECRET_KEY, ALGORITHM
+    from fastapi.testclient import TestClient as PlainTestClient
+    from main import app
+
+    token = create_access_token()
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    revoke_token(payload["jti"])
+
+    plain_client = PlainTestClient(app)
+    resp = plain_client.get("/api/events", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401

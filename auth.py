@@ -1,4 +1,5 @@
 import os
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from argon2 import PasswordHasher
@@ -15,10 +16,12 @@ if not SECRET_KEY:
     raise RuntimeError("ADMIN_SECRET_KEY environment variable is required")
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = 15
 
 security = HTTPBearer()
 ph = PasswordHasher()
+
+_token_blocklist: set[str] = set()
 
 
 def hash_password(password: str) -> str:
@@ -34,8 +37,12 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def create_access_token() -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    return jwt.encode({"sub": "admin", "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
+    now = datetime.now(timezone.utc)
+    expire = now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    return jwt.encode(
+        {"sub": "admin", "exp": expire, "iat": now, "jti": str(uuid.uuid4())},
+        SECRET_KEY, algorithm=ALGORITHM,
+    )
 
 
 def get_admin_token(
@@ -45,9 +52,16 @@ def get_admin_token(
         payload = jwt.decode(
             credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM]
         )
+        jti = payload.get("jti")
+        if jti and jti in _token_blocklist:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
         return payload["sub"]
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+
+
+def revoke_token(jti: str):
+    _token_blocklist.add(jti)
 
 
 def get_admin_password_hash() -> str:
