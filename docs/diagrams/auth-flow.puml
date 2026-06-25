@@ -1,0 +1,30 @@
+@startuml
+!theme plain
+
+actor Admin
+participant "Vue SPA" as Frontend
+participant "FastAPI" as API
+participant "Auth Module" as Auth
+database "MongoDB" as DB
+
+Admin -> Frontend: Enter password
+Frontend -> API: POST /api/admin/login
+API -> Auth: verify_password()
+Auth --> API: true/false
+
+alt Password valid
+  API -> Auth: create_access_token()
+  Auth --> API: JWT token
+  API --> Frontend: { access_token, token_type }
+  Frontend -> Frontend: Store in sessionStorage
+  Frontend -> API: GET /api/events\n(Authorization: Bearer <token>)
+  API -> Auth: get_admin_token()
+  Auth --> API: decoded payload
+  API -> DB: Event.objects()
+  DB --> API: documents
+  API --> Frontend: [EventOut]
+else Password invalid
+  API --> Frontend: 401 Unauthorized
+end
+
+@enduml

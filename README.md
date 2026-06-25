@@ -117,44 +117,6 @@ cd frontend && npm run dev
 - **Max size**: 50MB
 - **TIFF processing**: Automatic bounds extraction and PNG preview generation
 
-## Security Features
-
-### OWASP Top 10 Compliance
-
-| Category | Implementation |
-|----------|----------------|
-| A01: Broken Access Control | JWT authentication on all mutation endpoints |
-| A02: Cryptographic Failures | Argon2id password hashing, HS256 JWT |
-| A03: Injection | MongoEngine ODM (no raw queries), input validation |
-| A05: Security Misconfiguration | Security headers, no default credentials |
-| A07: Auth Failures | Rate limiting (5/min), token revocation, 15min expiry |
-
-### Rate Limiting
-
-Login endpoint is rate-limited to 5 attempts per minute per IP using SlowAPI.
-
-### Token Security
-
-- **Expiry**: 15 minutes
-- **Claims**: `sub`, `exp`, `iat`, `jti` (unique token ID)
-- **Revocation**: Server-side blocklist for compromised tokens
-
-### Upload Security
-
-- **Magic byte validation**: Uses `filetype` library (500+ formats)
-- **Path traversal prevention**: `os.path.basename()` strips directory components
-- **Size limit**: 50MB maximum
-- **Content-Type validation**: Verified against magic bytes, not client headers
-
-### Security Headers (Nginx)
-
-```
-X-Content-Type-Options: nosniff
-X-Frame-Options: DENY
-Referrer-Policy: strict-origin-when-cross-origin
-Content-Security-Policy: default-src 'self'; script-src 'self'; ...
-```
-
 ## Project Structure
 
 ```
@@ -206,7 +168,3 @@ cd frontend && npm run build
 # Start development
 docker compose up --build
 ```
-
-## License
-
-[Add your license here]

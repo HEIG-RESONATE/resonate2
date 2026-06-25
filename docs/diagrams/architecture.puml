@@ -1,0 +1,32 @@
+@startuml
+!theme plain
+skinparam componentStyle rectangle
+skinparam defaultFontName "Arial"
+
+package "Frontend" {
+  [Vue 3 SPA] as [Vue]
+  [Leaflet Map] as [Map]
+  [Nginx] as [Nginx]
+}
+
+package "Backend" {
+  [FastAPI] as [API]
+  [Auth Module] as [Auth]
+  [MongoEngine ODM] as [ODM]
+}
+
+package "Data" {
+  database "MongoDB" as [Mongo]
+  storage "Image Storage" as [Images]
+}
+
+[Nginx] --> [Vue] : serves static files
+[Nginx] --> [API] : proxies /api/*
+[Nginx] --> [API] : proxies /images/*
+[Vue] --> [API] : REST API calls
+[API] --> [Auth] : JWT validation
+[API] --> [ODM] : document operations
+[ODM] --> [Mongo] : queries
+[API] --> [Images] : file upload/download
+
+@enduml

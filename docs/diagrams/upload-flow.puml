@@ -1,0 +1,31 @@
+@startuml
+!theme plain
+
+actor Admin
+participant "Vue SPA" as Frontend
+participant "FastAPI" as API
+participant "filetype" as FT
+participant "rasterio" as RIO
+database "Image Storage" as Storage
+database "MongoDB" as DB
+
+Admin -> Frontend: Select file + metadata
+Frontend -> API: POST /api/events/{id}/images
+
+API -> API: Validate file size (max 50MB)
+API -> FT: Detect magic bytes
+FT --> API: MIME type valid/invalid
+
+API -> Storage: Write file
+
+alt TIF/COG file
+  API -> RIO: Extract bounds
+  RIO --> API: [west, south, east, north]
+  API -> RIO: Generate PNG preview
+  RIO --> API: preview file
+end
+
+API -> DB: Update Event.images
+API --> Frontend: { status: "ok", image: {...} }
+
+@enduml
