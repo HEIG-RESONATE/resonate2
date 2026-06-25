@@ -46,6 +46,14 @@ def set_images_dir(tmp_path):
     os.environ.pop("IMAGES_DIR", None)
 
 
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    """Reset the rate limiter between tests."""
+    from main import limiter
+    limiter._storage.reset()
+    yield
+
+
 @pytest.fixture
 def client(setup_mongo) -> TestClient:
     """Return test client with mocked MongoDB."""

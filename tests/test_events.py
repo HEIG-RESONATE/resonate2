@@ -257,3 +257,13 @@ def test_upload_accepts_valid_png(client):
     body = resp.json()
     assert body["status"] == "ok"
     assert body["image"]["filename"].endswith("_test.png")
+
+
+def test_login_rate_limit(client):
+    """Test that login endpoint enforces rate limiting."""
+    for _ in range(5):
+        resp = client.post("/api/admin/login", json={"password": "wrong"})
+        assert resp.status_code == 401
+
+    resp = client.post("/api/admin/login", json={"password": "wrong"})
+    assert resp.status_code == 429

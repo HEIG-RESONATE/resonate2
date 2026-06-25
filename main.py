@@ -1,13 +1,19 @@
-from fastapi import Depends, FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import Depends, FastAPI, HTTPException, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional, List, Union
 from datetime import datetime
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from fastapi.responses import JSONResponse
 import mongoengine
 import os
 import re
 from auth import create_access_token, verify_password, admin_password, get_admin_token
+
+limiter = Limiter(key_func=get_remote_address)
 
 MONGO_HOST = os.environ.get("MONGO_HOST", "mongodb")
 
@@ -78,6 +84,14 @@ def get_db():
 
 
 app = FastAPI()
+app.state.limiter = limiter
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Too many login attempts. Try again later."},
+    )
 
 
 class LoginRequest(BaseModel):
@@ -90,7 +104,8 @@ class TokenResponse(BaseModel):
 
 
 @app.post("/api/admin/login", response_model=TokenResponse)
-def admin_login(req: LoginRequest):
+@limiter.limit("5/minute")
+def admin_login(request: Request, req: LoginRequest):
     if not verify_password(req.password, admin_password.hash):
         raise HTTPException(status_code=401, detail="Invalid password")
     return TokenResponse(access_token=create_access_token())
