@@ -57,7 +57,11 @@
 
 ## Project Layout
 
-- **Flat layout** — no `src/`; `main.py` is the FastAPI entrypoint (module-level `app`)
+- **Layered architecture** — `main.py` contains only routes; logic lives in services
+  - `models.py` — MongoEngine document definitions
+  - `schemas.py` — Pydantic request/response models
+  - `services/events.py` — Event CRUD operations
+  - `services/images.py` — Image upload, validation, and processing
 - **Tests** in `tests/`; conftest provides authenticated `client` fixture
 - **Frontend** — Vue 3 + Vite SPA in `frontend/`; proxies `/api/*` to backend via Nginx in Docker
 - **Python 3.12** enforced by `.python-version`
@@ -105,7 +109,7 @@ MONGO_HOST=mongodb://resonate:${MONGO_PASSWORD}@mongodb:27017/resonate?authSourc
 
 ## Architecture
 
-- **MongoEngine ODM** — `main.py` defines `Event` document
+- **MongoEngine ODM** — `models.py` defines `Event` document
 - **Coordinates**: API accepts/returns `{"lat": float, "lng": float}` dicts; MongoEngine stores `(lat, lng)` tuples. Conversion at endpoint boundaries.
 - **Auth**: JWT (HS256, 15min expiry) + Argon2id password hashing
 - **Uploads**: Magic byte validation via `filetype` library, rasterio for TIF processing

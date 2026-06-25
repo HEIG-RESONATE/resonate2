@@ -121,8 +121,14 @@ cd frontend && npm run dev
 
 ```
 resonate2/
-├── main.py              # FastAPI application & routes
+├── main.py              # FastAPI application & routes (thin layer)
 ├── auth.py              # JWT & password utilities
+├── models.py            # MongoEngine document definitions
+├── schemas.py           # Pydantic request/response models
+├── services/
+│   ├── __init__.py
+│   ├── events.py        # Event CRUD logic
+│   └── images.py        # Image upload & processing
 ├── pyproject.toml       # Python dependencies
 ├── docker-compose.yml   # Docker services
 ├── Dockerfile           # API container

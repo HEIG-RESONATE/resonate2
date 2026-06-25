@@ -10,8 +10,10 @@ package "Frontend" {
 }
 
 package "Backend" {
-  [FastAPI] as [API]
+  [FastAPI Routes] as [API]
   [Auth Module] as [Auth]
+  [Event Service] as [EventService]
+  [Image Service] as [ImageService]
   [MongoEngine ODM] as [ODM]
 }
 
@@ -25,8 +27,10 @@ package "Data" {
 [Nginx] --> [API] : proxies /images/*
 [Vue] --> [API] : REST API calls
 [API] --> [Auth] : JWT validation
-[API] --> [ODM] : document operations
+[API] --> [EventService] : event CRUD
+[API] --> [ImageService] : upload/processing
+[EventService] --> [ODM] : document operations
+[ImageService] --> [Images] : file storage
 [ODM] --> [Mongo] : queries
-[API] --> [Images] : file upload/download
 
 @enduml
