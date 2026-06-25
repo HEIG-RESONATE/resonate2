@@ -37,7 +37,7 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 
 
 @app.post("/api/admin/login", response_model=TokenResponse)
-@limiter.limit("5/minute")
+@limiter.limit("15/minute")
 def admin_login(request: Request, req: LoginRequest):
     if not verify_password(req.password, admin_password.hash):
         raise HTTPException(status_code=401, detail="Invalid password")

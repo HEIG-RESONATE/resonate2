@@ -261,7 +261,7 @@ def test_upload_accepts_valid_png(client):
 
 def test_login_rate_limit(client):
     """Test that login endpoint enforces rate limiting."""
-    for _ in range(5):
+    for _ in range(15):
         resp = client.post("/api/admin/login", json={"password": "wrong"})
         assert resp.status_code == 401
 

@@ -450,6 +450,11 @@ async function login() {
       body: JSON.stringify({ password: password.value }),
     })
 
+    if (res.status === 429) {
+      error.value = 'Too many login attempts. Please wait a minute and try again.'
+      return
+    }
+
     if (!res.ok) {
       error.value = 'Wrong password'
       return
