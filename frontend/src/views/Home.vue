@@ -3,7 +3,7 @@
     <div class="main-area">
       <div id="map"></div>
 
-      <div v-if="filteredEvents.length >= 1" class="timeline">
+      <div class="timeline">
         <div class="timeline-top">
           <label class="filter-label filter-left">
             From
@@ -22,7 +22,7 @@
           </label>
         </div>
         <div class="timeline-viewport">
-          <div class="timeline-track" :style="{ transform: `translateX(${trackOffset}px)` }">
+          <div v-if="filteredEvents.length > 0" class="timeline-track" :style="{ transform: `translateX(${trackOffset}px)` }">
             <button
               v-for="(event, index) in filteredEvents"
               :key="event.id"
@@ -35,6 +35,7 @@
               <span class="timeline-title">{{ event.title }}</span>
             </button>
           </div>
+          <div v-else class="timeline-empty">No events in this date range</div>
         </div>
       </div>
     </div>
@@ -481,6 +482,13 @@ html, body {
   overflow: hidden;
   width: 600px;
   margin: 0 auto;
+}
+
+.timeline-empty {
+  text-align: center;
+  padding: 0.5rem;
+  color: #888;
+  font-size: 0.8rem;
 }
 
 .timeline-track {
