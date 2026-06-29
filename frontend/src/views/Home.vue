@@ -102,7 +102,7 @@
         <div v-if="loading" class="loading">Loading...</div>
         <div v-else-if="events.length === 0" class="empty">No events yet</div>
         <ul v-else class="event-list">
-          <li v-for="event in events" :key="event.id" class="event-item" @click="selectEvent(event)">
+          <li v-for="event in filteredEvents" :key="event.id" class="event-item" @click="selectEvent(event)">
             <span class="event-title">{{ event.title }}</span>
             <span class="event-date">{{ formatDate(event.date) }}</span>
           </li>
@@ -161,8 +161,20 @@ const trackOffset = computed(() => {
   return centerOffset - activeIndex.value * ITEM_WIDTH
 })
 
-watch(filterFrom, () => { activeIndex.value = 0 })
-watch(filterTo, () => { activeIndex.value = 0 })
+watch(filterFrom, () => { activeIndex.value = 0; refreshMarkers() })
+watch(filterTo, () => { activeIndex.value = 0; refreshMarkers() })
+
+function refreshMarkers() {
+  map.eachLayer(layer => {
+    if (layer instanceof L.Marker) {
+      map.removeLayer(layer)
+    }
+  })
+  clearImageOverlay()
+  if (!selectedEvent.value) {
+    showAllMarkers()
+  }
+}
 
 onMounted(async () => {
   try {
@@ -186,7 +198,7 @@ onMounted(async () => {
 
 function showAllMarkers() {
   const allCoords = []
-  events.value.forEach(event => {
+  filteredEvents.value.forEach(event => {
     if (event.points && event.points.coordinates) {
       event.points.coordinates.forEach(coord => {
         L.marker([coord[0], coord[1]])
