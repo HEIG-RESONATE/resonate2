@@ -343,6 +343,13 @@ function formatTimelineDate(dateStr) {
 }
 </script>
 
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+}
+</style>
+
 <style scoped>
 .timeline {
   position: absolute;
