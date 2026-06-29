@@ -516,6 +516,7 @@ html, body {
   padding: 0.4rem 0.5rem;
   padding-top: 1.5rem;
   border: none;
+  border-radius: 10px;
   background: white;
   cursor: pointer;
   text-align: center;
