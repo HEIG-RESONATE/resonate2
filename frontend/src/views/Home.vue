@@ -1,28 +1,40 @@
 <template>
   <div class="home">
-    <div id="map"></div>
+    <div class="main-area">
+      <div id="map"></div>
 
-    <div v-if="events.length >= 2" class="timeline">
-      <div class="timeline-controls">
-        <button class="timeline-btn" @click="prevEvent">← Prev</button>
-        <button class="timeline-btn play-btn" @click="playTimeline">
-          {{ isPlaying ? '⏹ Stop' : '▶ Play' }}
-        </button>
-        <button class="timeline-btn" @click="nextEvent">Next →</button>
-      </div>
-      <div class="timeline-track">
-        <div class="timeline-dates">
-          <button
-            v-for="(event, index) in events"
-            :key="event.id"
-            class="timeline-item"
-            :class="{ active: selectedEvent?.id === event.id }"
-            @click="selectEventByIndex(index)"
-          >
-            <span class="timeline-dot"></span>
-            <span class="timeline-date">{{ formatTimelineDate(event.date) }}</span>
-            <span class="timeline-title">{{ event.title }}</span>
-          </button>
+      <div v-if="filteredEvents.length >= 1" class="timeline">
+        <div class="timeline-top">
+          <label class="filter-label filter-left">
+            From
+            <input type="date" v-model="filterFrom" class="filter-input" />
+          </label>
+          <div class="timeline-controls">
+            <button class="timeline-btn" @click="prevEvent" :disabled="filteredEvents.length === 0">←</button>
+            <button class="timeline-btn play-btn" @click="playTimeline">
+              {{ isPlaying ? '⏹' : '▶' }}
+            </button>
+            <button class="timeline-btn" @click="nextEvent" :disabled="filteredEvents.length === 0">→</button>
+          </div>
+          <label class="filter-label filter-right">
+            To
+            <input type="date" v-model="filterTo" class="filter-input" />
+          </label>
+        </div>
+        <div class="timeline-viewport">
+          <div class="timeline-track" :style="{ transform: `translateX(${trackOffset}px)` }">
+            <button
+              v-for="(event, index) in filteredEvents"
+              :key="event.id"
+              class="timeline-item"
+              :class="{ active: selectedEvent?.id === event.id }"
+              @click="selectFilteredEvent(index)"
+            >
+              <span class="timeline-dot"></span>
+              <span class="timeline-date">{{ formatTimelineDate(event.date) }}</span>
+              <span class="timeline-title">{{ event.title }}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -100,7 +112,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -112,6 +124,9 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
+const ITEM_WIDTH = 120
+const VISIBLE_COUNT = 5
+
 const events = ref([])
 const loading = ref(true)
 const selectedEvent = ref(null)
@@ -120,8 +135,33 @@ let imageOverlay = null
 const showRaster = ref({})
 
 const isPlaying = ref(false)
-const currentIndex = ref(0)
+const activeIndex = ref(0)
 let playInterval = null
+
+const filterFrom = ref('')
+const filterTo = ref('')
+
+const filteredEvents = computed(() => {
+  return events.value.filter(e => {
+    const d = new Date(e.date)
+    if (filterFrom.value && d < new Date(filterFrom.value)) return false
+    if (filterTo.value) {
+      const to = new Date(filterTo.value)
+      to.setHours(23, 59, 59, 999)
+      if (d > to) return false
+    }
+    return true
+  })
+})
+
+const trackOffset = computed(() => {
+  const viewportWidth = ITEM_WIDTH * VISIBLE_COUNT
+  const centerOffset = viewportWidth / 2 - ITEM_WIDTH / 2
+  return centerOffset - activeIndex.value * ITEM_WIDTH
+})
+
+watch(filterFrom, () => { activeIndex.value = 0 })
+watch(filterTo, () => { activeIndex.value = 0 })
 
 onMounted(async () => {
   try {
@@ -196,6 +236,7 @@ function clearImageOverlay() {
 
 function clearSelection() {
   selectedEvent.value = null
+  activeIndex.value = 0
   stopTimeline()
 
   // Clear markers and image overlay
@@ -246,7 +287,7 @@ function toggleRaster(img) {
 }
 
 function playTimeline() {
-  if (events.value.length < 2) return
+  if (filteredEvents.value.length < 2) return
 
   if (isPlaying.value) {
     stopTimeline()
@@ -254,12 +295,12 @@ function playTimeline() {
   }
 
   isPlaying.value = true
-  currentIndex.value = 0
-  selectEventByIndex(0)
+  activeIndex.value = 0
+  selectFilteredEvent(0)
 
   playInterval = setInterval(() => {
-    currentIndex.value = (currentIndex.value + 1) % events.value.length
-    selectEventByIndex(currentIndex.value)
+    activeIndex.value = (activeIndex.value + 1) % filteredEvents.value.length
+    selectFilteredEvent(activeIndex.value)
   }, 3000)
 }
 
@@ -273,33 +314,24 @@ function stopTimeline() {
 
 function prevEvent() {
   stopTimeline()
-  if (events.value.length === 0) return
-
-  if (!selectedEvent.value) {
-    currentIndex.value = 0
-  } else {
-    const currentIdx = events.value.findIndex(e => e.id === selectedEvent.value.id)
-    currentIndex.value = currentIdx > 0 ? currentIdx - 1 : events.value.length - 1
-  }
-  selectEventByIndex(currentIndex.value)
+  if (filteredEvents.value.length === 0) return
+  activeIndex.value = activeIndex.value > 0
+    ? activeIndex.value - 1
+    : filteredEvents.value.length - 1
+  selectFilteredEvent(activeIndex.value)
 }
 
 function nextEvent() {
   stopTimeline()
-  if (events.value.length === 0) return
-
-  if (!selectedEvent.value) {
-    currentIndex.value = 0
-  } else {
-    const currentIdx = events.value.findIndex(e => e.id === selectedEvent.value.id)
-    currentIndex.value = (currentIdx + 1) % events.value.length
-  }
-  selectEventByIndex(currentIndex.value)
+  if (filteredEvents.value.length === 0) return
+  activeIndex.value = (activeIndex.value + 1) % filteredEvents.value.length
+  selectFilteredEvent(activeIndex.value)
 }
 
-function selectEventByIndex(index) {
-  const event = events.value[index]
+function selectFilteredEvent(index) {
+  const event = filteredEvents.value[index]
   if (event) {
+    activeIndex.value = index
     selectedEvent.value = event
     showRaster.value = {}
 
@@ -351,29 +383,72 @@ html, body {
 </style>
 
 <style scoped>
+.home {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
+
+.main-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+#map {
+  flex: 1;
+}
+
 .timeline {
-  position: absolute;
-  bottom: 20px;
-  left: calc(50% - 160px);
-  transform: translateX(-50%);
-  z-index: 1000;
   background: white;
-  border-radius: 12px;
-  padding: 0.75rem 1rem;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  max-width: 90vw;
-  width: 600px;
+  padding: 0.6rem 1.5rem 0.75rem;
+  border-top: 1px solid #e0e0e0;
+  font-family: "Lexend", sans-serif;
+}
+
+.timeline-top {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+
+.filter-left {
+  justify-self: right;
+  margin-right: 10px;
+}
+
+.filter-right {
+  justify-self: left;
+  margin-left: 10px;
+}
+
+.filter-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #555;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.filter-input {
+  padding: 0.2rem 0.4rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: "Lexend", sans-serif;
 }
 
 .timeline-controls {
   display: flex;
-  justify-content: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: 0.4rem;
 }
 
 .timeline-btn {
-  padding: 0.4rem 0.8rem;
+  padding: 0.3rem 0.7rem;
   border: 1px solid #ccc;
   background: white;
   border-radius: 6px;
@@ -382,43 +457,49 @@ html, body {
   transition: all 0.2s;
 }
 
-.timeline-btn:hover {
+.timeline-btn:hover:not(:disabled) {
   background: #f0f0f0;
+}
+
+.timeline-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .play-btn {
   background: #2d5a3f;
   color: white;
   border-color: #2d5a3f;
-  min-width: 80px;
+  min-width: 42px;
 }
 
-.play-btn:hover {
+.play-btn:hover:not(:disabled) {
   background: #1e3d2a;
 }
 
-.timeline-track {
-  position: relative;
+.timeline-viewport {
+  overflow: hidden;
+  width: 600px;
+  margin: 0 auto;
 }
 
-.timeline-dates {
+.timeline-track {
   display: flex;
-  gap: 0;
-  overflow-x: auto;
-  padding-bottom: 0.25rem;
+  transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  will-change: transform;
 }
 
 .timeline-item {
   flex-shrink: 0;
-  padding: 0.5rem 0.75rem;
+  width: 120px;
+  box-sizing: border-box;
+  padding: 0.4rem 0.5rem;
   padding-top: 1.5rem;
   border: none;
-  border-radius: 8px;
   background: white;
   cursor: pointer;
   text-align: center;
-  min-width: 100px;
-  transition: all 0.2s;
+  transition: background 0.2s;
   position: relative;
 }
 
@@ -480,7 +561,7 @@ html, body {
   display: block;
   font-size: 0.75rem;
   font-weight: 600;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.15rem;
 }
 
 .timeline-title {
@@ -490,19 +571,6 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 120px;
-}
-
-.home {
-  display: flex;
-  height: 100vh;
-  width: 100%;
-  position: relative;
-  overflow: hidden;
-}
-
-#map {
-  flex: 1;
-  height: 100%;
 }
 
 .sidebar {
