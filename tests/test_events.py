@@ -462,3 +462,69 @@ def test_upload_tif_with_bounds(client):
 
         finally:
             os.unlink(tmp_path)
+
+
+def test_create_event_with_news(client):
+    """Test creating an event with news items."""
+    payload = {
+        "title": "Event with News",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+        "news": [
+            {"title": "First news article", "extra": {"source": "Reuters"}},
+            {"title": "Second news article", "extra": None},
+        ],
+    }
+
+    resp = client.post("/api/events", json=payload)
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["news"] is not None
+    assert len(body["news"]) == 2
+    assert body["news"][0]["title"] == "First news article"
+    assert body["news"][0]["extra"]["source"] == "Reuters"
+    assert body["news"][1]["title"] == "Second news article"
+    assert body["news"][1]["extra"] is None
+
+
+def test_update_event_with_news(client):
+    """Test updating an event's news items."""
+    resp = client.post("/api/events", json={
+        "title": "Original",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+    })
+    event_id = resp.json()["id"]
+
+    update_payload = {
+        "title": "Updated with News",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+        "news": [{"title": "Updated news", "extra": {"url": "https://example.com"}}],
+    }
+
+    resp = client.put(f"/api/events/{event_id}", json=update_payload)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["news"] is not None
+    assert len(body["news"]) == 1
+    assert body["news"][0]["title"] == "Updated news"
+
+
+def test_event_news_in_public_endpoint(client):
+    """Test that news items are included in public endpoint."""
+    payload = {
+        "title": "Public News Event",
+        "date": "2026-07-15T19:00:00",
+        "news": [{"title": "Public news", "extra": {"category": "politics"}}],
+    }
+
+    client.post("/api/events", json=payload)
+
+    resp = client.get("/api/public/events")
+    assert resp.status_code == 200
+    events = resp.json()
+    event = next(e for e in events if e["title"] == "Public News Event")
+    assert event["news"] is not None
+    assert len(event["news"]) == 1
+    assert event["news"][0]["title"] == "Public news"

@@ -2,6 +2,13 @@
 !theme plain
 skinparam classAttributeIconSize 0
 
+class NewsItem {
+  +title: str
+  +extra: Optional[dict]
+  --
+  +validate_extra_size()
+}
+
 class Event {
   +id: ObjectId
   +title: StringField
@@ -9,6 +16,7 @@ class Event {
   +points: DictField
   +extra: DictField
   +images: ListField
+  +news: ListField[NewsItem]
   --
   +save()
   +delete()
@@ -20,6 +28,7 @@ class EventCreate {
   +points: Optional[dict]
   +extra: Optional[dict]
   +images: Optional[list]
+  +news: Optional[List[NewsItem]]
   --
   +validate_extra_size()
 }
@@ -31,6 +40,7 @@ class EventOut {
   +points: Optional[dict]
   +extra: Optional[dict]
   +images: Optional[list]
+  +news: Optional[List[NewsItem]]
 }
 
 class LoginRequest {
@@ -45,5 +55,6 @@ class TokenResponse {
 EventCreate ..> Event : creates
 Event ..> EventOut : serializes
 LoginRequest ..> TokenResponse : authenticates
+Event "1" *-- "*" NewsItem : contains
 
 @enduml

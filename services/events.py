@@ -3,7 +3,7 @@ from typing import Optional
 
 from fastapi import HTTPException
 
-from models import Event
+from models import Event, NewsItem
 from schemas import EventOut
 
 
@@ -24,6 +24,12 @@ def format_points(points) -> Optional[dict]:
     return None
 
 
+def format_news(news) -> Optional[list]:
+    if not news:
+        return None
+    return [{"title": item.title, "extra": item.extra} for item in news]
+
+
 def doc_to_event_out(doc: Event) -> EventOut:
     return EventOut(
         id=str(doc.id),
@@ -32,6 +38,7 @@ def doc_to_event_out(doc: Event) -> EventOut:
         points=format_points(doc.points),
         extra=doc.extra,
         images=doc.images,
+        news=format_news(doc.news),
     )
 
 
@@ -52,9 +59,13 @@ def get_event(event_id: str) -> EventOut:
     return doc_to_event_out(doc)
 
 
-def create_event(title: str, date: str, points=None, extra=None, images=None) -> EventOut:
+def create_event(title: str, date: str, points=None, extra=None, images=None, news=None) -> EventOut:
     parsed_date = datetime.fromisoformat(date)
     normalized_points = normalize_points(points)
+
+    news_items = None
+    if news:
+        news_items = [NewsItem(title=n["title"], extra=n.get("extra")) for n in news]
 
     doc = Event(
         title=title,
@@ -62,12 +73,13 @@ def create_event(title: str, date: str, points=None, extra=None, images=None) ->
         points=normalized_points,
         extra=extra,
         images=images or [],
+        news=news_items or [],
     )
     doc.save()
     return doc_to_event_out(doc)
 
 
-def update_event(event_id: str, title: str, date: str, points=None, extra=None, images=None) -> EventOut:
+def update_event(event_id: str, title: str, date: str, points=None, extra=None, images=None, news=None) -> EventOut:
     doc = get_event_or_404(event_id)
     parsed_date = datetime.fromisoformat(date)
     normalized_points = normalize_points(points)
@@ -78,6 +90,8 @@ def update_event(event_id: str, title: str, date: str, points=None, extra=None, 
     doc.extra = extra
     if images is not None:
         doc.images = images
+    if news is not None:
+        doc.news = [NewsItem(title=n["title"], extra=n.get("extra")) for n in news]
     doc.save()
 
     return doc_to_event_out(doc)

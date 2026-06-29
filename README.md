@@ -107,6 +107,14 @@ cd frontend && npm run dev
       "bounds": [west, south, east, north],
       "preview": "filename_preview.png"
     }
+  ],
+  "news": [
+    {
+      "title": "string",
+      "extra": {
+        "key": "value"
+      }
+    }
   ]
 }
 ```

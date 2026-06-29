@@ -62,6 +62,7 @@ def store_event(event: EventCreate, _=Depends(get_admin_token)):
         points=event.points,
         extra=event.extra,
         images=event.images,
+        news=[n.model_dump() for n in event.news] if event.news else None,
     )
 
 
@@ -74,6 +75,7 @@ def update_event(event_id: str, event: EventCreate, _=Depends(get_admin_token)):
         points=event.points,
         extra=event.extra,
         images=event.images,
+        news=[n.model_dump() for n in event.news] if event.news else None,
     )
 
 

@@ -68,6 +68,19 @@
               </button>
             </div>
           </div>
+
+          <div v-if="selectedEvent.news && selectedEvent.news.length > 0" class="detail-news">
+            <span class="detail-label">Related News</span>
+            <div v-for="(item, i) in selectedEvent.news" :key="i" class="news-item">
+              <span class="news-title">{{ item.title }}</span>
+              <div v-if="item.extra && Object.keys(item.extra).length > 0" class="news-extra">
+                <div v-for="(value, key) in item.extra" :key="key" class="extra-item">
+                  <span class="extra-key">{{ key }}:</span>
+                  <span class="extra-value">{{ value }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </template>
 
@@ -330,14 +343,6 @@ function formatTimelineDate(dateStr) {
 }
 </script>
 
-<style>
-html, body {
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-}
-</style>
-
 <style scoped>
 .timeline {
   position: absolute;
@@ -485,6 +490,7 @@ html, body {
   height: 100vh;
   width: 100%;
   position: relative;
+  overflow: hidden;
 }
 
 #map {
@@ -578,6 +584,31 @@ html, body {
   margin-top: 0.5rem;
   padding-top: 1rem;
   border-top: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.detail-news {
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.news-item {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+}
+
+.news-title {
+  font-weight: 600;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.news-extra {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .images-header {

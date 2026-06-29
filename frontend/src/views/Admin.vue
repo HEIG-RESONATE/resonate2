@@ -46,6 +46,25 @@
           </div>
         </div>
 
+        <div class="form-group">
+          <label>Related News</label>
+          <div class="news-list">
+            <div v-for="(item, i) in newsItems" :key="i" class="news-item">
+              <input v-model="item.title" placeholder="News title" class="news-title-input" />
+              <div class="news-extra-fields">
+                <div v-for="(field, j) in item.extraFields" :key="j" class="extra-field-row">
+                  <input v-model="field.key" placeholder="Field name" />
+                  <input v-model="field.value" placeholder="Value" />
+                  <button type="button" class="btn-remove" @click="removeNewsExtraField(i, j)">×</button>
+                </div>
+                <button type="button" class="btn-small" @click="addNewsExtraField(i)">+ Add field</button>
+              </div>
+              <button type="button" class="btn-remove" @click="removeNewsItem(i)">Remove news</button>
+            </div>
+            <button type="button" class="btn-small" @click="addNewsItem">+ Add news</button>
+          </div>
+        </div>
+
         <div v-if="editing && eventImages.length" class="form-group">
           <label>Satellite Images</label>
           <div class="image-list">
@@ -73,7 +92,7 @@
         </div>
 
           <div class="form-actions">
-            <button type="submit" class="btn-primary">{{ editing ? 'Update' : 'Add' }}</button>
+            <button type="submit" class="btn-primary">{{ editing ? 'Update Event' : 'Create Event' }}</button>
             <button v-if="editing" type="button" class="btn-secondary" @click="cancelEdit">Cancel</button>
           </div>
         </form>
@@ -165,6 +184,7 @@ const form = reactive({
 })
 
 const extraFields = ref([{ key: '', value: '' }])
+const newsItems = ref([{ title: '', extraFields: [{ key: '', value: '' }] }])
 const editingPoints = ref(null)
 const eventImages = ref([])
 const uploadFile = ref(null)
@@ -263,6 +283,35 @@ function loadExtraFields(extra) {
   }
 }
 
+function addNewsItem() {
+  newsItems.value.push({ title: '', extraFields: [{ key: '', value: '' }] })
+}
+
+function removeNewsItem(i) {
+  newsItems.value.splice(i, 1)
+}
+
+function addNewsExtraField(i) {
+  newsItems.value[i].extraFields.push({ key: '', value: '' })
+}
+
+function removeNewsExtraField(i, j) {
+  newsItems.value[i].extraFields.splice(j, 1)
+}
+
+function loadNewsItems(news) {
+  if (news && news.length > 0) {
+    newsItems.value = news.map(item => ({
+      title: item.title,
+      extraFields: item.extra && Object.keys(item.extra).length > 0
+        ? Object.entries(item.extra).map(([key, value]) => ({ key, value: String(value) }))
+        : [{ key: '', value: '' }]
+    }))
+  } else {
+    newsItems.value = [{ title: '', extraFields: [{ key: '', value: '' }] }]
+  }
+}
+
 function editEvent(event) {
   editing.value = event.id
   form.title = event.title
@@ -270,6 +319,7 @@ function editEvent(event) {
   form.pointsStr = event.points?.coordinates?.map(c => c.join(',')).join(';') || ''
   form.extra = event.extra || {}
   loadExtraFields(event.extra)
+  loadNewsItems(event.news)
   eventImages.value = event.images || []
 
   // Store points for map picker
@@ -299,11 +349,28 @@ async function saveEvent() {
     }
   })
 
+  // Build news items from form
+  const news = newsItems.value
+    .filter(item => item.title.trim())
+    .map(item => {
+      const itemExtra = {}
+      item.extraFields.forEach(f => {
+        if (f.key.trim()) {
+          itemExtra[f.key.trim()] = f.value
+        }
+      })
+      return {
+        title: item.title.trim(),
+        extra: Object.keys(itemExtra).length > 0 ? itemExtra : null,
+      }
+    })
+
   const payload = {
     title: form.title,
     date: new Date(form.date).toISOString(),
     points: points ? { type: 'MultiPoint', coordinates: points } : null,
     extra: Object.keys(extra).length > 0 ? extra : null,
+    news: news.length > 0 ? news : null,
   }
 
   const url = editing.value
@@ -593,6 +660,9 @@ body {
   padding: 2rem;
   max-width: 1000px;
   margin: 0 auto;
+  overflow-y: auto;
+  height: 100vh;
+  box-sizing: border-box;
 }
 
 .nav {
@@ -688,6 +758,36 @@ body {
   padding: 0.5rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
+}
+
+.news-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.news-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: var(--bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.news-title-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-weight: 600;
+}
+
+.news-extra-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .btn-remove {
