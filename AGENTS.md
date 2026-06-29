@@ -54,6 +54,7 @@
 - **Start dev server (API):** `uv run uvicorn main:app --reload`
 - **Docker (all services):** `docker compose up --build`
 - **Build frontend:** `cd frontend && npm run build`
+- **E2E tests:** `cd frontend && npm run cy:run` (headless) or `npm run cy:open` (interactive)
 
 ## Project Layout
 
@@ -64,6 +65,7 @@
   - `services/images.py` — Image upload, validation, and processing
 - **Tests** in `tests/`; conftest provides authenticated `client` fixture
 - **Frontend** — Vue 3 + Vite SPA in `frontend/`; proxies `/api/*` to backend via Nginx in Docker
+- **E2E tests** — Cypress in `frontend/cypress/`; tests JWT auth flow against running app
 - **Python 3.12** enforced by `.python-version`
 
 ## Architecture Diagrams
@@ -123,6 +125,14 @@ MONGO_HOST=mongodb://resonate:${MONGO_PASSWORD}@mongodb:27017/resonate?authSourc
 - Do NOT use `mongomock://` URIs — removed in mongoengine 0.27+
 - `main.py` has connection guard: `if "default" not in mongoengine.connection._connections` — allows test fixtures to pre-connect
 - Rate limiter is reset between tests via `reset_rate_limiter` fixture
+
+### E2E Tests (Cypress)
+
+- Run against running app (`docker compose up --build` first)
+- Tests login, wrong password, CRUD, navigation, and JWT persistence
+- Password loaded from root `.env` via dotenv — never hardcoded in test files
+- Run headless: `cd frontend && npm run cy:run`
+- Run interactive: `cd frontend && npm run cy:open`
 
 ## Code Review Checklist
 

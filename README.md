@@ -154,6 +154,13 @@ resonate2/
     │   └── views/
     │       ├── Home.vue     # Public map + timeline
     │       └── Admin.vue    # Event management
+    ├── cypress/
+    │   ├── e2e/
+    │   │   └── auth.cy.js  # E2E auth tests
+    │   └── support/
+    │       ├── e2e.js
+    │       └── commands.js # Custom commands
+    ├── cypress.config.js   # Cypress configuration
     ├── nginx.conf        # Reverse proxy config
     └── Dockerfile        # Frontend container
 ```
@@ -181,4 +188,31 @@ cd frontend && npm run build
 
 # Start development
 docker compose up --build
+
+# Run E2E tests (requires running app)
+cd frontend && npm run cy:run
 ```
+
+## Testing
+
+### Unit & Integration Tests
+
+```bash
+uv run pytest tests/ -v
+```
+
+30 tests covering CRUD, authentication, validation, image uploads, and more.
+
+### E2E Tests (Cypress)
+
+```bash
+cd frontend
+npm run cy:run    # headless
+npm run cy:open   # interactive UI
+```
+
+5 tests covering the admin JWT authentication flow:
+- Login with correct/wrong password
+- Create and delete events
+- Navigation between admin and map
+- JWT persistence across page reloads
