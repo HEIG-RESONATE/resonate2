@@ -829,9 +829,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem;
-  background: var(--bg);
-  border-radius: var(--radius);
+  padding: 0.5rem 0;
   font-size: 0.875rem;
 }
 

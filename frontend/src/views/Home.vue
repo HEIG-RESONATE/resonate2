@@ -295,7 +295,7 @@ function toggleRaster(img) {
   }
 
   if (showRaster.value[img.filename]) {
-    imageOverlay = L.imageOverlay(imageUrl, imageBounds, { opacity: 0.7 }).addTo(map)
+    imageOverlay = L.imageOverlay(imageUrl, imageBounds, { opacity: 1.0 }).addTo(map)
   }
 }
 
