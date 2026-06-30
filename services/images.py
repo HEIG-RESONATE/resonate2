@@ -11,7 +11,7 @@ from models import Event
 logger = logging.getLogger(__name__)
 
 IMAGES_DIR = os.environ.get("IMAGES_DIR", "/app/images")
-ALLOWED_UPLOAD_TYPES = {"image/tiff", "image/png", "image/jpeg"}
+ALLOWED_UPLOAD_TYPES = {"image/png", "image/jpeg"}
 MAX_UPLOAD_MB = 50
 
 
@@ -23,7 +23,7 @@ def validate_upload(content: bytes, content_type: str | None) -> None:
     if kind is None:
         raise HTTPException(
             status_code=400,
-            detail="Unable to determine file type. Only PNG, JPEG, and TIFF are allowed.",
+            detail="Unable to determine file type. Only PNG and JPEG are allowed.",
         )
     if kind.mime not in ALLOWED_UPLOAD_TYPES:
         raise HTTPException(
@@ -48,58 +48,21 @@ def save_file(content: bytes, event_id: str, safe_name: str) -> str:
     return filename
 
 
-def process_tif(filename: str, filepath: str) -> tuple[list | None, str | None]:
-    bounds = None
-    preview_filename = None
-
-    if not filename.lower().endswith((".tif", ".tiff")):
-        return bounds, preview_filename
-
+def parse_bounds(bounds_str: str | None) -> list[float] | None:
+    if not bounds_str:
+        return None
     try:
-        import rasterio
-
-        with rasterio.open(filepath) as src:
-            bounds = list(src.bounds)
-
-            preview_filename = filename.rsplit(".", 1)[0] + "_preview.png"
-            images_dir = os.environ.get("IMAGES_DIR", IMAGES_DIR)
-            preview_path = os.path.join(images_dir, preview_filename)
-
-            if src.count >= 3:
-                data = src.read(
-                    [1, 2, 3],
-                    out_shape=(3, 500, 500),
-                    resampling=rasterio.enums.Resampling.bilinear,
-                )
-            else:
-                data = src.read(
-                    1,
-                    out_shape=(1, 500, 500),
-                    resampling=rasterio.enums.Resampling.bilinear,
-                )
-
-            with rasterio.open(
-                preview_path,
-                "w",
-                driver="PNG",
-                width=data.shape[2],
-                height=data.shape[1],
-                count=data.shape[0],
-                dtype=data.dtype,
-            ) as dst:
-                dst.write(data)
-
-            logger.info("Created preview: %s", preview_filename)
-
-    except Exception:
-        logger.warning("Failed to extract bounds or create preview", exc_info=True)
-        bounds = None
-        preview_filename = None
-
-    return bounds, preview_filename
+        parts = [float(x.strip()) for x in bounds_str.split(",")]
+        if len(parts) != 4:
+            raise HTTPException(status_code=400, detail="Bounds must have exactly 4 values: west,south,east,north")
+        return parts
+    except (ValueError, HTTPException) as e:
+        if isinstance(e, HTTPException):
+            raise
+        raise HTTPException(status_code=400, detail="Invalid bounds format. Use: west,south,east,north")
 
 
-def upload_image(event_id: str, content: bytes, name: str, image_type: str, filename: str | None = None) -> dict:
+def upload_image(event_id: str, content: bytes, name: str, image_type: str, bounds: list[float] | None = None, filename: str | None = None) -> dict:
     doc = Event.objects(id=event_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Event not found")
@@ -108,17 +71,13 @@ def upload_image(event_id: str, content: bytes, name: str, image_type: str, file
 
     safe_name = sanitize_filename(filename)
     saved_filename = save_file(content, event_id, safe_name)
-    images_dir = os.environ.get("IMAGES_DIR", IMAGES_DIR)
-    filepath = os.path.join(images_dir, os.path.basename(saved_filename))
-
-    bounds, preview_filename = process_tif(saved_filename, filepath)
 
     image_data = {
         "filename": saved_filename,
         "name": name,
         "image_type": image_type,
         "bounds": bounds,
-        "preview": preview_filename,
+        "preview": saved_filename,
     }
 
     if not doc.images:

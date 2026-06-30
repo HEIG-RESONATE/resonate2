@@ -102,14 +102,17 @@ async def upload_image(
     file: UploadFile = File(...),
     name: str = Form(...),
     image_type: str = Form("optical"),
+    bounds: str = Form(None),
     _=Depends(get_admin_token),
 ):
     content = await file.read()
+    parsed_bounds = image_service.parse_bounds(bounds)
     image_data = image_service.upload_image(
         event_id=event_id,
         content=content,
         name=name,
         image_type=image_type,
+        bounds=parsed_bounds,
         filename=file.filename,
     )
     return {"status": "ok", "image": image_data}

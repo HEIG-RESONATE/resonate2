@@ -414,54 +414,42 @@ def test_upload_to_nonexistent_event(client):
     assert resp.status_code == 404
 
 
-def test_upload_tif_with_bounds(client):
-    """Test that TIF upload extracts bounds and creates preview."""
-    import rasterio
-    import numpy as np
-    import tempfile
-    import os
-
+def test_upload_with_bounds(client):
+    """Test that upload with bounds stores them correctly."""
     resp = client.post("/api/events", json={
-        "title": "TIF Test",
+        "title": "Bounds Test",
         "date": "2026-07-15T19:00:00",
         "points": None,
     })
     event_id = resp.json()["id"]
 
-    with tempfile.NamedTemporaryFile(suffix=".tif", delete=False) as tmp:
-        tmp_path = tmp.name
-        try:
-            with rasterio.open(
-                tmp_path,
-                "w",
-                driver="GTiff",
-                height=100,
-                width=100,
-                count=3,
-                dtype=np.uint8,
-                crs="EPSG:4326",
-                transform=rasterio.transform.from_bounds(6.0, 46.0, 8.0, 47.0, 100, 100),
-            ) as dst:
-                data = np.random.randint(0, 255, (3, 100, 100), dtype=np.uint8)
-                dst.write(data)
+    resp = client.post(
+        f"/api/events/{event_id}/images",
+        files={"file": ("test.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 100, "image/png")},
+        data={"name": "satellite image", "image_type": "optical", "bounds": "6.0,46.0,8.0,47.0"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert body["image"]["bounds"] == [6.0, 46.0, 8.0, 47.0]
 
-            with open(tmp_path, "rb") as f:
-                tif_content = f.read()
 
-            resp = client.post(
-                f"/api/events/{event_id}/images",
-                files={"file": ("test.tif", tif_content, "image/tiff")},
-                data={"name": "satellite image", "image_type": "optical"},
-            )
-            assert resp.status_code == 200
-            body = resp.json()
-            assert body["status"] == "ok"
-            assert body["image"]["bounds"] is not None
-            assert len(body["image"]["bounds"]) == 4
-            assert body["image"]["preview"] is not None
+def test_upload_rejects_tiff(client):
+    """Test that TIFF files are rejected."""
+    resp = client.post("/api/events", json={
+        "title": "TIFF Reject",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+    })
+    event_id = resp.json()["id"]
 
-        finally:
-            os.unlink(tmp_path)
+    resp = client.post(
+        f"/api/events/{event_id}/images",
+        files={"file": ("test.tif", b"II*\x00" + b"\x00" * 100, "image/tiff")},
+        data={"name": "satellite image", "image_type": "optical"},
+    )
+    assert resp.status_code == 400
+    assert "not allowed" in resp.json()["detail"]
 
 
 def test_create_event_with_news(client):

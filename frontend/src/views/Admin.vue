@@ -76,14 +76,20 @@
         </div>
 
         <div v-if="editing" class="form-group">
-          <label>Upload TIFF</label>
+          <label>Upload Satellite Image</label>
           <div class="upload-form">
-            <input type="file" @change="e => uploadFile = e.target.files[0]" accept=".tif,.tiff" />
+            <input type="file" @change="e => uploadFile = e.target.files[0]" accept=".png,.jpg,.jpeg" />
             <input v-model="uploadName" placeholder="Image name (e.g., Before 2024)" />
             <select v-model="uploadType">
               <option value="optical">Optical</option>
               <option value="sar">SAR</option>
             </select>
+            <div class="bounds-inputs">
+              <input v-model="uploadBoundsWest" type="number" step="any" placeholder="West" />
+              <input v-model="uploadBoundsSouth" type="number" step="any" placeholder="South" />
+              <input v-model="uploadBoundsEast" type="number" step="any" placeholder="East" />
+              <input v-model="uploadBoundsNorth" type="number" step="any" placeholder="North" />
+            </div>
             <button type="button" class="btn-small" :disabled="uploading" @click="uploadImage(editing)">
               {{ uploading ? 'Uploading...' : 'Upload' }}
             </button>
@@ -190,6 +196,10 @@ const eventImages = ref([])
 const uploadFile = ref(null)
 const uploadName = ref('')
 const uploadType = ref('optical')
+const uploadBoundsWest = ref('')
+const uploadBoundsSouth = ref('')
+const uploadBoundsEast = ref('')
+const uploadBoundsNorth = ref('')
 const uploading = ref(false)
 const uploadSuccess = ref(false)
 
@@ -437,6 +447,16 @@ async function uploadImage(eventId) {
   formData.append('name', uploadName.value)
   formData.append('image_type', uploadType.value)
 
+  const bounds = [
+    uploadBoundsWest.value,
+    uploadBoundsSouth.value,
+    uploadBoundsEast.value,
+    uploadBoundsNorth.value,
+  ]
+  if (bounds.every(v => v !== '')) {
+    formData.append('bounds', bounds.join(','))
+  }
+
   try {
     const res = await fetch(`/api/events/${eventId}/images`, {
       method: 'POST',
@@ -451,6 +471,10 @@ async function uploadImage(eventId) {
       uploadFile.value = null
       uploadName.value = ''
       uploadType.value = 'optical'
+      uploadBoundsWest.value = ''
+      uploadBoundsSouth.value = ''
+      uploadBoundsEast.value = ''
+      uploadBoundsNorth.value = ''
       uploadSuccess.value = true
       setTimeout(() => { uploadSuccess.value = false }, 3000)
       await loadEvents()
@@ -862,6 +886,20 @@ body {
   padding: 0.5rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
+}
+
+.bounds-inputs {
+  display: flex;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.bounds-inputs input {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
 }
 
 .form-actions {
