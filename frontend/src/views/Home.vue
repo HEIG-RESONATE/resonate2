@@ -85,7 +85,12 @@
           <div v-if="selectedEvent.news && selectedEvent.news.length > 0" class="detail-news">
             <span class="detail-label">Related News</span>
             <div v-for="(item, i) in selectedEvent.news" :key="i" class="news-item">
-              <span class="news-title">{{ item.title }}</span>
+              <a v-if="item.url" :href="item.url" target="_blank" rel="noopener noreferrer" class="news-link">
+                <span class="news-title">{{ item.title }}</span>
+                <span class="news-external-icon">↗</span>
+              </a>
+              <span v-else class="news-title">{{ item.title }}</span>
+              <span v-if="item.author" class="news-author">— {{ item.author }}</span>
               <div v-if="item.extra && Object.keys(item.extra).length > 0" class="news-extra">
                 <div v-for="(value, key) in item.extra" :key="key" class="extra-item">
                   <span class="extra-key">{{ key }}:</span>
@@ -701,6 +706,32 @@ html, body {
   font-weight: 600;
   display: block;
   margin-bottom: 0.25rem;
+}
+
+.news-link {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #4ade80;
+  text-decoration: none;
+  font-weight: 600;
+  transition: opacity 0.2s;
+}
+
+.news-link:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.news-external-icon {
+  font-size: 0.8rem;
+}
+
+.news-author {
+  display: block;
+  font-size: 0.85rem;
+  opacity: 0.75;
+  margin-top: 0.15rem;
 }
 
 .news-extra {

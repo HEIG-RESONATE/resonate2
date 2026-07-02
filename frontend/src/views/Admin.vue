@@ -51,6 +51,8 @@
           <div class="news-list">
             <div v-for="(item, i) in newsItems" :key="i" class="news-item">
               <input v-model="item.title" placeholder="News title" class="news-title-input" />
+              <input v-model="item.url" placeholder="URL (optional)" class="news-url-input" />
+              <input v-model="item.author" placeholder="Author (optional)" class="news-author-input" />
               <div class="news-extra-fields">
                 <div v-for="(field, j) in item.extraFields" :key="j" class="extra-field-row">
                   <input v-model="field.key" placeholder="Field name" />
@@ -190,7 +192,7 @@ const form = reactive({
 })
 
 const extraFields = ref([{ key: '', value: '' }])
-const newsItems = ref([{ title: '', extraFields: [{ key: '', value: '' }] }])
+const newsItems = ref([{ title: '', url: '', author: '', extraFields: [{ key: '', value: '' }] }])
 const editingPoints = ref(null)
 const eventImages = ref([])
 const uploadFile = ref(null)
@@ -294,7 +296,7 @@ function loadExtraFields(extra) {
 }
 
 function addNewsItem() {
-  newsItems.value.push({ title: '', extraFields: [{ key: '', value: '' }] })
+  newsItems.value.push({ title: '', url: '', author: '', extraFields: [{ key: '', value: '' }] })
 }
 
 function removeNewsItem(i) {
@@ -313,12 +315,14 @@ function loadNewsItems(news) {
   if (news && news.length > 0) {
     newsItems.value = news.map(item => ({
       title: item.title,
+      url: item.url || '',
+      author: item.author || '',
       extraFields: item.extra && Object.keys(item.extra).length > 0
         ? Object.entries(item.extra).map(([key, value]) => ({ key, value: String(value) }))
         : [{ key: '', value: '' }]
     }))
   } else {
-    newsItems.value = [{ title: '', extraFields: [{ key: '', value: '' }] }]
+    newsItems.value = [{ title: '', url: '', author: '', extraFields: [{ key: '', value: '' }] }]
   }
 }
 
@@ -371,6 +375,8 @@ async function saveEvent() {
       })
       return {
         title: item.title.trim(),
+        url: item.url.trim() || undefined,
+        author: item.author.trim() || undefined,
         extra: Object.keys(itemExtra).length > 0 ? itemExtra : null,
       }
     })

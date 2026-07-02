@@ -5,6 +5,8 @@ from pydantic import BaseModel, field_validator
 
 class NewsItem(BaseModel):
     title: str
+    url: Optional[str] = None
+    author: Optional[str] = None
     extra: Optional[dict] = None
 
     @field_validator("extra")

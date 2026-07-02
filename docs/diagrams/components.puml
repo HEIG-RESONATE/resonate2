@@ -4,6 +4,8 @@ skinparam classAttributeIconSize 0
 
 class NewsItem {
   +title: str
+  +url: Optional[str]
+  +author: Optional[str]
   +extra: Optional[dict]
   --
   +validate_extra_size()

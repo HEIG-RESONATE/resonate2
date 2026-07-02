@@ -4,6 +4,8 @@ import mongoengine
 
 class NewsItem(mongoengine.EmbeddedDocument):
     title = mongoengine.StringField(required=True)
+    url = mongoengine.StringField(null=True, blank=True)
+    author = mongoengine.StringField(null=True, blank=True)
     extra = mongoengine.DictField(null=True, blank=True)
 
 

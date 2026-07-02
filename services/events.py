@@ -27,7 +27,7 @@ def format_points(points) -> Optional[dict]:
 def format_news(news) -> Optional[list]:
     if not news:
         return None
-    return [{"title": item.title, "extra": item.extra} for item in news]
+    return [{"title": item.title, "url": item.url, "author": item.author, "extra": item.extra} for item in news]
 
 
 def doc_to_event_out(doc: Event) -> EventOut:
@@ -65,7 +65,7 @@ def create_event(title: str, date: str, points=None, extra=None, images=None, ne
 
     news_items = None
     if news:
-        news_items = [NewsItem(title=n["title"], extra=n.get("extra")) for n in news]
+        news_items = [NewsItem(title=n["title"], url=n.get("url"), author=n.get("author"), extra=n.get("extra")) for n in news]
 
     doc = Event(
         title=title,
@@ -91,7 +91,7 @@ def update_event(event_id: str, title: str, date: str, points=None, extra=None, 
     if images is not None:
         doc.images = images
     if news is not None:
-        doc.news = [NewsItem(title=n["title"], extra=n.get("extra")) for n in news]
+        doc.news = [NewsItem(title=n["title"], url=n.get("url"), author=n.get("author"), extra=n.get("extra")) for n in news]
     doc.save()
 
     return doc_to_event_out(doc)

@@ -111,6 +111,8 @@ cd frontend && npm run dev
   "news": [
     {
       "title": "string",
+      "url": "string",
+      "author": "string",
       "extra": {
         "key": "value"
       }
