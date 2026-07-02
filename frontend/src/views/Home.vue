@@ -132,7 +132,7 @@ const events = ref([])
 const loading = ref(true)
 const selectedEvent = ref(null)
 let map = null
-let imageOverlay = null
+let imageOverlays = {}
 const showRaster = ref({})
 
 const isPlaying = ref(false)
@@ -241,10 +241,10 @@ function selectEvent(event) {
 }
 
 function clearImageOverlay() {
-  if (imageOverlay) {
-    map.removeLayer(imageOverlay)
-    imageOverlay = null
-  }
+  Object.values(imageOverlays).forEach(overlay => {
+    map.removeLayer(overlay)
+  })
+  imageOverlays = {}
 }
 
 function clearSelection() {
@@ -288,14 +288,16 @@ function toggleRaster(img) {
   const bounds = img.bounds
   const imageBounds = [[bounds[1], bounds[0]], [bounds[3], bounds[2]]]
 
-  // Clear existing overlay for this specific image
-  if (imageOverlay) {
-    map.removeLayer(imageOverlay)
-    imageOverlay = null
-  }
-
+  // Toggle this specific image
   if (showRaster.value[img.filename]) {
-    imageOverlay = L.imageOverlay(imageUrl, imageBounds, { opacity: 1.0 }).addTo(map)
+    if (!imageOverlays[img.filename]) {
+      imageOverlays[img.filename] = L.imageOverlay(imageUrl, imageBounds, { opacity: 1.0 }).addTo(map)
+    }
+  } else {
+    if (imageOverlays[img.filename]) {
+      map.removeLayer(imageOverlays[img.filename])
+      delete imageOverlays[img.filename]
+    }
   }
 }
 
