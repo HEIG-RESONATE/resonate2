@@ -115,7 +115,7 @@ MONGO_HOST=mongodb://resonate:${MONGO_PASSWORD}@mongodb:27017/resonate?authSourc
 - **Coordinates**: API accepts/returns `{"lat": float, "lng": float}` dicts; MongoEngine stores `(lat, lng)` tuples. Conversion at endpoint boundaries.
 - **News**: Each event can have multiple related news items with title and optional extra fields
 - **Auth**: JWT (HS256, 15min expiry) + Argon2id password hashing
-- **Uploads**: Magic byte validation via `filetype` library, rasterio for TIF processing
+- **Uploads**: Magic byte validation via `filetype` library, user-provided bounds for map overlay
 
 ## Testing
 

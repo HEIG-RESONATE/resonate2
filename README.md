@@ -103,9 +103,9 @@ cd frontend && npm run dev
     {
       "filename": "string",
       "name": "string",
-      "image_type": "optical|sar|elevation",
+      "image_type": "optical|sar",
       "bounds": [west, south, east, north],
-      "preview": "filename_preview.png"
+      "preview": "string"
     }
   ],
   "news": [
@@ -121,9 +121,9 @@ cd frontend && npm run dev
 
 ### Upload Validation
 
-- **Allowed types**: PNG, JPEG, TIFF (detected by magic bytes)
+- **Allowed types**: PNG, JPEG (detected by magic bytes)
 - **Max size**: 50MB
-- **TIFF processing**: Automatic bounds extraction and PNG preview generation
+- **Bounds**: Optional, user-provided `west,south,east,north` for map overlay positioning
 
 ## Project Structure
 
@@ -143,7 +143,7 @@ resonate2/
 ├── .env.example         # Environment template
 ├── tests/
 │   ├── conftest.py      # Test fixtures
-│   └── test_events.py   # API tests (19 tests)
+│   └── test_events.py   # API tests (31 tests)
 ├── docs/
 │   └── diagrams/
 │       ├── *.puml       # PlantUML source files
@@ -156,7 +156,8 @@ resonate2/
     │       └── Admin.vue    # Event management
     ├── cypress/
     │   ├── e2e/
-    │   │   └── auth.cy.js  # E2E auth tests
+    │   │   ├── auth.cy.js       # E2E auth tests
+    │   │   └── timeline.cy.js   # E2E timeline filter tests
     │   └── support/
     │       ├── e2e.js
     │       └── commands.js # Custom commands
