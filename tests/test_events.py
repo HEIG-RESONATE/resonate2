@@ -6,7 +6,7 @@ def test_store_and_retrieve(client):
     payload = {
         "title": "Concert in the park",
         "date": "2026-07-15T19:00:00",
-        "points": {"type": "MultiPoint", "coordinates": [[46.5197, 7.0], [46.52, 7.01]]},
+        "points": {"type": "MultiPoint", "coordinates": [[7.0, 46.5197], [7.01, 46.52]]},
     }
 
     resp = client.post("/api/events", json=payload)
@@ -52,7 +52,7 @@ def test_update_event(client):
     update_payload = {
         "title": "Updated Title",
         "date": "2026-07-16T20:00:00",
-        "points": {"type": "MultiPoint", "coordinates": [[46.5, 7.0]]},
+        "points": {"type": "MultiPoint", "coordinates": [[7.0, 46.5]]},
     }
 
     resp = client.put(f"/api/events/{event_id}", json=update_payload)
@@ -190,15 +190,15 @@ def test_points_normalization_list(client):
     payload = {
         "title": "Point Test",
         "date": "2026-07-15T19:00:00",
-        "points": [[46.5, 7.0], [46.6, 7.1]],
+        "points": [[7.0, 46.5], [7.1, 46.6]],
     }
 
     resp = client.post("/api/events", json=payload)
     body = resp.json()
 
     assert body["points"]["type"] == "MultiPoint"
-    assert body["points"]["coordinates"][0] == [46.5, 7.0]
-    assert body["points"]["coordinates"][1] == [46.6, 7.1]
+    assert body["points"]["coordinates"][0] == [7.0, 46.5]
+    assert body["points"]["coordinates"][1] == [7.1, 46.6]
 
 
 def test_upload_rejects_invalid_content_type(client):

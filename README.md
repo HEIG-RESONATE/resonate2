@@ -94,7 +94,7 @@ cd frontend && npm run dev
   "date": "ISO 8601 datetime",
   "points": {
     "type": "MultiPoint",
-    "coordinates": [[lat, lng], ...]
+    "coordinates": [[lng, lat], ...]
   },
   "extra": {
     "key": "value"

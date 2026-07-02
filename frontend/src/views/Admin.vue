@@ -355,7 +355,7 @@ function editEvent(event) {
   editing.value = event.id
   form.title = event.title
   form.date = event.date.slice(0, 16)
-  form.pointsStr = event.points?.coordinates?.map(c => c.join(',')).join(';') || ''
+  form.pointsStr = event.points?.coordinates?.map(c => [c[1], c[0]].join(',')).join(';') || ''
   form.extra = event.extra || {}
   loadExtraFields(event.extra)
   loadNewsItems(event.news)
@@ -364,7 +364,7 @@ function editEvent(event) {
 
   // Store points for map picker
   if (event.points && event.points.coordinates && event.points.coordinates.length > 0) {
-    editingPoints.value = event.points.coordinates.map(c => [c[0], c[1]])
+    editingPoints.value = event.points.coordinates.map(c => [c[1], c[0]])
   } else {
     editingPoints.value = null
   }
@@ -418,7 +418,7 @@ async function saveEvent() {
   const payload = {
     title: form.title,
     date: new Date(form.date).toISOString(),
-    points: points ? { type: 'MultiPoint', coordinates: points } : null,
+    points: points ? { type: 'MultiPoint', coordinates: points.map(p => [p[1], p[0]]) } : null,
     extra: Object.keys(extra).length > 0 ? extra : null,
     carousel_images: carouselImgs.length > 0 ? carouselImgs : undefined,
     news: news.length > 0 ? news : null,

@@ -55,7 +55,7 @@
           <div v-if="selectedEvent.points && selectedEvent.points.coordinates" class="detail-row">
             <span class="detail-label">Coordinates</span>
             <span class="detail-value">
-              {{ selectedEvent.points.coordinates.map(c => `${c[0]}, ${c[1]}`).join('; ') }}
+              {{ selectedEvent.points.coordinates.map(c => `${c[1]}, ${c[0]}`).join('; ') }}
             </span>
           </div>
 
@@ -239,10 +239,10 @@ function showAllMarkers() {
   filteredEvents.value.forEach(event => {
     if (event.points && event.points.coordinates) {
       event.points.coordinates.forEach(coord => {
-        L.marker([coord[0], coord[1]])
+        L.marker([coord[1], coord[0]])
           .bindPopup(`<strong>${event.title}</strong><br>${formatDate(event.date)}`)
           .addTo(map)
-        allCoords.push(coord)
+        allCoords.push([coord[1], coord[0]])
       })
     }
   })
@@ -266,10 +266,10 @@ function selectEvent(event) {
   if (event.points && event.points.coordinates) {
     const coords = []
     event.points.coordinates.forEach(coord => {
-      L.marker([coord[0], coord[1]])
+      L.marker([coord[1], coord[0]])
         .bindPopup(`<strong>${event.title}</strong><br>${formatDate(event.date)}`)
         .addTo(map)
-      coords.push(coord)
+      coords.push([coord[1], coord[0]])
     })
 
     fitMapToCoords(coords)
@@ -412,10 +412,10 @@ function selectFilteredEvent(index) {
     if (event.points && event.points.coordinates) {
       const coords = []
       event.points.coordinates.forEach(coord => {
-        L.marker([coord[0], coord[1]])
+        L.marker([coord[1], coord[0]])
           .bindPopup(`<strong>${event.title}</strong><br>${formatDate(event.date)}`)
           .addTo(map)
-        coords.push(coord)
+        coords.push([coord[1], coord[0]])
       })
       fitMapToCoords(coords)
     }
