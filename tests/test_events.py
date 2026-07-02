@@ -516,3 +516,125 @@ def test_event_news_in_public_endpoint(client):
     assert event["news"] is not None
     assert len(event["news"]) == 1
     assert event["news"][0]["title"] == "Public news"
+
+
+def test_parse_bounds_invalid_count(client):
+    """Test that bounds with wrong number of values are rejected."""
+    resp = client.post("/api/events", json={
+        "title": "Bad Bounds",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+    })
+    event_id = resp.json()["id"]
+
+    resp = client.post(
+        f"/api/events/{event_id}/images",
+        files={"file": ("test.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 100, "image/png")},
+        data={"name": "img", "image_type": "optical", "bounds": "1.0,2.0,3.0"},
+    )
+    assert resp.status_code == 400
+    assert "exactly 4 values" in resp.json()["detail"]
+
+
+def test_parse_bounds_non_numeric(client):
+    """Test that bounds with non-numeric values are rejected."""
+    resp = client.post("/api/events", json={
+        "title": "Bad Bounds",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+    })
+    event_id = resp.json()["id"]
+
+    resp = client.post(
+        f"/api/events/{event_id}/images",
+        files={"file": ("test.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 100, "image/png")},
+        data={"name": "img", "image_type": "optical", "bounds": "a,b,c,d"},
+    )
+    assert resp.status_code == 400
+    assert "Invalid bounds format" in resp.json()["detail"]
+
+
+def test_event_str_representation(setup_mongo):
+    """Test that Event.__str__ returns the title."""
+    from datetime import datetime
+    from models import Event
+    doc = Event(title="Test Event", date=datetime(2026, 7, 15)).save()
+    assert str(doc) == "Test Event"
+
+
+def test_create_event_with_news_extra_size_limit(client):
+    """Test that news items with oversized extra fields are rejected."""
+    huge_extra = {"data": "x" * 70000}
+    resp = client.post("/api/events", json={
+        "title": "News Extra Limit",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+        "news": [{"title": "Oversized", "extra": huge_extra}],
+    })
+    assert resp.status_code == 422
+
+
+def test_create_event_with_carousel_images(client):
+    """Test creating an event with carousel images."""
+    payload = {
+        "title": "Carousel Test",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+        "carousel_images": [
+            {"url": "https://example.com/photo1.jpg", "description": "Before", "source_url": "https://example.com"},
+            {"url": "https://example.com/photo2.jpg", "description": "After"},
+        ],
+    }
+
+    resp = client.post("/api/events", json=payload)
+    assert resp.status_code == 201
+    body = resp.json()
+    assert len(body["carousel_images"]) == 2
+    assert body["carousel_images"][0]["url"] == "https://example.com/photo1.jpg"
+    assert body["carousel_images"][0]["description"] == "Before"
+    assert body["carousel_images"][0]["source_url"] == "https://example.com"
+    assert body["carousel_images"][1]["url"] == "https://example.com/photo2.jpg"
+    assert body["carousel_images"][1]["description"] == "After"
+    assert body["carousel_images"][1]["source_url"] is None
+
+
+def test_update_event_carousel_images(client):
+    """Test updating an event's carousel images."""
+    resp = client.post("/api/events", json={
+        "title": "Original",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+    })
+    event_id = resp.json()["id"]
+
+    update_payload = {
+        "title": "Updated",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+        "carousel_images": [{"url": "https://example.com/new.jpg", "description": "Updated view", "source_url": "https://source.com"}],
+    }
+
+    resp = client.put(f"/api/events/{event_id}", json=update_payload)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["carousel_images"]) == 1
+    assert body["carousel_images"][0]["url"] == "https://example.com/new.jpg"
+    assert body["carousel_images"][0]["description"] == "Updated view"
+    assert body["carousel_images"][0]["source_url"] == "https://source.com"
+
+
+def test_carousel_images_in_public_endpoint(client):
+    """Test that carousel images are included in public endpoint."""
+    payload = {
+        "title": "Public Carousel",
+        "date": "2026-07-15T19:00:00",
+        "carousel_images": [{"url": "https://example.com/pub.jpg", "description": "Public photo"}],
+    }
+
+    client.post("/api/events", json=payload)
+
+    resp = client.get("/api/public/events")
+    events = resp.json()
+    event = next(e for e in events if e["title"] == "Public Carousel")
+    assert event["carousel_images"][0]["url"] == "https://example.com/pub.jpg"
+    assert event["carousel_images"][0]["description"] == "Public photo"

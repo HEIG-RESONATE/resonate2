@@ -82,6 +82,24 @@
             </div>
           </div>
 
+          <div v-if="selectedEvent.carousel_images && selectedEvent.carousel_images.length > 0" class="detail-carousel">
+            <span class="detail-label">Images</span>
+            <div class="carousel">
+              <div class="carousel-image-wrapper">
+                <img :src="carouselImages[carouselIndex].url" alt="Event image" class="carousel-image" />
+              </div>
+              <div class="carousel-meta">
+                <p v-if="carouselImages[carouselIndex].description" class="carousel-description">{{ carouselImages[carouselIndex].description }}</p>
+                <a v-if="carouselImages[carouselIndex].source_url" :href="carouselImages[carouselIndex].source_url" target="_blank" rel="noopener noreferrer" class="carousel-source-link">View source ↗</a>
+              </div>
+              <div class="carousel-controls">
+                <button class="carousel-btn" @click="prevCarousel" :disabled="carouselIndex === 0">←</button>
+                <span class="carousel-counter">{{ carouselIndex + 1 }} / {{ carouselImages.length }}</span>
+                <button class="carousel-btn" @click="nextCarousel" :disabled="carouselIndex === carouselImages.length - 1">→</button>
+              </div>
+            </div>
+          </div>
+
           <div v-if="selectedEvent.news && selectedEvent.news.length > 0" class="detail-news">
             <span class="detail-label">Related News</span>
             <div v-for="(item, i) in selectedEvent.news" :key="i" class="news-item">
@@ -139,6 +157,8 @@ const selectedEvent = ref(null)
 let map = null
 let imageOverlays = {}
 const showRaster = ref({})
+const carouselIndex = ref(0)
+const carouselImages = computed(() => selectedEvent.value?.carousel_images || [])
 
 const isPlaying = ref(false)
 const activeIndex = ref(0)
@@ -219,6 +239,7 @@ function showAllMarkers() {
 
 function selectEvent(event) {
   selectedEvent.value = event
+  carouselIndex.value = 0
 
   // Clear existing markers and image overlay
   map.eachLayer(layer => {
@@ -283,6 +304,18 @@ function fitMapToCoords(coords) {
 function zoomToImage(bounds) {
   const imageBounds = [[bounds[1], bounds[0]], [bounds[3], bounds[2]]]
   map.fitBounds(imageBounds, { padding: [50, 50] })
+}
+
+function nextCarousel() {
+  if (carouselIndex.value < carouselImages.value.length - 1) {
+    carouselIndex.value++
+  }
+}
+
+function prevCarousel() {
+  if (carouselIndex.value > 0) {
+    carouselIndex.value--
+  }
 }
 
 function toggleRaster(img) {
@@ -353,6 +386,7 @@ function selectFilteredEvent(index) {
   if (event) {
     activeIndex.value = index
     selectedEvent.value = event
+    carouselIndex.value = 0
     showRaster.value = {}
 
     map.eachLayer(layer => {
@@ -732,6 +766,88 @@ html, body {
   font-size: 0.85rem;
   opacity: 0.75;
   margin-top: 0.15rem;
+}
+
+.detail-carousel {
+  margin-top: 1rem;
+}
+
+.carousel {
+  display: flex;
+  flex-direction: column;
+  height: 300px;
+}
+
+.carousel-image-wrapper {
+  flex: 1;
+  min-height: 0;
+}
+
+.carousel-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.carousel-meta {
+  min-height: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.carousel-source-link {
+  display: inline-block;
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  color: #4ade80;
+  text-decoration: none;
+}
+
+.carousel-source-link:hover {
+  text-decoration: underline;
+}
+
+.carousel-description {
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+  opacity: 0.85;
+  line-height: 1.4;
+}
+
+.carousel-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.carousel-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  padding: 0.3rem 0.7rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.2s;
+}
+
+.carousel-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.carousel-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.carousel-counter {
+  font-size: 0.85rem;
+  opacity: 0.75;
 }
 
 .news-extra {

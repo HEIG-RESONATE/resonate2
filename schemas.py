@@ -17,12 +17,19 @@ class NewsItem(BaseModel):
         return v
 
 
+class CarouselImage(BaseModel):
+    url: str
+    source_url: Optional[str] = None
+    description: Optional[str] = None
+
+
 class EventCreate(BaseModel):
     title: str
     date: str
     points: Optional[Union[list, dict]] = None
     extra: Optional[dict] = None
     images: Optional[list] = None
+    carousel_images: Optional[List[CarouselImage]] = None
     news: Optional[List[NewsItem]] = None
 
     @field_validator("extra")
@@ -40,6 +47,7 @@ class EventOut(BaseModel):
     points: Optional[Union[list, dict]] = None
     extra: Optional[dict] = None
     images: Optional[list] = None
+    carousel_images: Optional[List[CarouselImage]] = None
     news: Optional[List[NewsItem]] = None
 
 

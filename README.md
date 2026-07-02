@@ -117,6 +117,13 @@ cd frontend && npm run dev
         "key": "value"
       }
     }
+  ],
+  "carousel_images": [
+    {
+      "url": "string",
+      "description": "string",
+      "source_url": "string"
+    }
   ]
 }
 ```

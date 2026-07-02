@@ -38,6 +38,7 @@ def doc_to_event_out(doc: Event) -> EventOut:
         points=format_points(doc.points),
         extra=doc.extra,
         images=doc.images,
+        carousel_images=doc.carousel_images,
         news=format_news(doc.news),
     )
 
@@ -59,7 +60,7 @@ def get_event(event_id: str) -> EventOut:
     return doc_to_event_out(doc)
 
 
-def create_event(title: str, date: str, points=None, extra=None, images=None, news=None) -> EventOut:
+def create_event(title: str, date: str, points=None, extra=None, images=None, carousel_images=None, news=None) -> EventOut:
     parsed_date = datetime.fromisoformat(date)
     normalized_points = normalize_points(points)
 
@@ -73,13 +74,14 @@ def create_event(title: str, date: str, points=None, extra=None, images=None, ne
         points=normalized_points,
         extra=extra,
         images=images or [],
+        carousel_images=carousel_images or [],
         news=news_items or [],
     )
     doc.save()
     return doc_to_event_out(doc)
 
 
-def update_event(event_id: str, title: str, date: str, points=None, extra=None, images=None, news=None) -> EventOut:
+def update_event(event_id: str, title: str, date: str, points=None, extra=None, images=None, carousel_images=None, news=None) -> EventOut:
     doc = get_event_or_404(event_id)
     parsed_date = datetime.fromisoformat(date)
     normalized_points = normalize_points(points)
@@ -90,6 +92,8 @@ def update_event(event_id: str, title: str, date: str, points=None, extra=None, 
     doc.extra = extra
     if images is not None:
         doc.images = images
+    if carousel_images is not None:
+        doc.carousel_images = carousel_images
     if news is not None:
         doc.news = [NewsItem(title=n["title"], url=n.get("url"), author=n.get("author"), extra=n.get("extra")) for n in news]
     doc.save()

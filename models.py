@@ -15,6 +15,7 @@ class Event(mongoengine.Document):
     points = mongoengine.DictField(null=True, blank=True)
     extra = mongoengine.DictField(null=True, blank=True)
     images = mongoengine.ListField(null=True, blank=True)
+    carousel_images = mongoengine.ListField(null=True, blank=True)
     news = mongoengine.ListField(mongoengine.EmbeddedDocumentField(NewsItem), null=True, blank=True)
 
     meta = {"collection": "events"}

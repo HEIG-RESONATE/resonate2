@@ -114,6 +114,7 @@ MONGO_HOST=mongodb://resonate:${MONGO_PASSWORD}@mongodb:27017/resonate?authSourc
 - **MongoEngine ODM** — `models.py` defines `Event` document with embedded `NewsItem` documents
 - **Coordinates**: API accepts/returns `{"lat": float, "lng": float}` dicts; MongoEngine stores `(lat, lng)` tuples. Conversion at endpoint boundaries.
 - **News**: Each event can have multiple related news items with title, optional URL, optional author, and optional extra fields
+- **Carousel images**: Each event can have images displayed in the sidebar carousel, with URL, optional description, and optional source URL
 - **Auth**: JWT (HS256, 15min expiry) + Argon2id password hashing
 - **Uploads**: Magic byte validation via `filetype` library, user-provided bounds for map overlay
 

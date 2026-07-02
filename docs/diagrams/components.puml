@@ -11,6 +11,12 @@ class NewsItem {
   +validate_extra_size()
 }
 
+class CarouselImage {
+  +url: str
+  +source_url: Optional[str]
+  +description: Optional[str]
+}
+
 class Event {
   +id: ObjectId
   +title: StringField
@@ -18,6 +24,7 @@ class Event {
   +points: DictField
   +extra: DictField
   +images: ListField
+  +carousel_images: ListField[CarouselImage]
   +news: ListField[NewsItem]
   --
   +save()
@@ -30,6 +37,7 @@ class EventCreate {
   +points: Optional[dict]
   +extra: Optional[dict]
   +images: Optional[list]
+  +carousel_images: Optional[List[CarouselImage]]
   +news: Optional[List[NewsItem]]
   --
   +validate_extra_size()
@@ -42,6 +50,7 @@ class EventOut {
   +points: Optional[dict]
   +extra: Optional[dict]
   +images: Optional[list]
+  +carousel_images: Optional[List[CarouselImage]]
   +news: Optional[List[NewsItem]]
 }
 
@@ -58,5 +67,6 @@ EventCreate ..> Event : creates
 Event ..> EventOut : serializes
 LoginRequest ..> TokenResponse : authenticates
 Event "1" *-- "*" NewsItem : contains
+Event "1" *-- "*" CarouselImage : contains
 
 @enduml

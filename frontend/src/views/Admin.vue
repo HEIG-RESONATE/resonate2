@@ -67,6 +67,20 @@
           </div>
         </div>
 
+        <div class="form-group">
+          <label>Carousel Images</label>
+          <div v-if="editing" class="carousel-images-section">
+            <div v-for="(img, i) in carouselImages" :key="i" class="carousel-image-row">
+              <input v-model="img.url" placeholder="Image URL" class="carousel-url-input" />
+              <input v-model="img.description" placeholder="Description (optional)" class="carousel-desc-input" />
+              <input v-model="img.source_url" placeholder="Source URL (optional)" class="carousel-source-input" />
+              <button type="button" class="btn-remove" @click="removeCarouselImage(i)">×</button>
+            </div>
+            <button type="button" class="btn-small" @click="addCarouselImage">+ Add image</button>
+          </div>
+          <div v-else class="text-muted">Save the event first to add images</div>
+        </div>
+
         <div v-if="editing && eventImages.length" class="form-group">
           <label>Satellite Images</label>
           <div class="image-list">
@@ -195,6 +209,7 @@ const extraFields = ref([{ key: '', value: '' }])
 const newsItems = ref([{ title: '', url: '', author: '', extraFields: [{ key: '', value: '' }] }])
 const editingPoints = ref(null)
 const eventImages = ref([])
+const carouselImages = ref([])
 const uploadFile = ref(null)
 const uploadName = ref('')
 const uploadType = ref('optical')
@@ -274,6 +289,8 @@ function resetForm() {
   errors.points = ''
   editing.value = null
   extraFields.value = [{ key: '', value: '' }]
+  newsItems.value = [{ title: '', url: '', author: '', extraFields: [{ key: '', value: '' }] }]
+  carouselImages.value = []
 }
 
 function addExtraField() {
@@ -326,6 +343,14 @@ function loadNewsItems(news) {
   }
 }
 
+function addCarouselImage() {
+  carouselImages.value.push({ url: '', description: '', source_url: '' })
+}
+
+function removeCarouselImage(i) {
+  carouselImages.value.splice(i, 1)
+}
+
 function editEvent(event) {
   editing.value = event.id
   form.title = event.title
@@ -335,6 +360,7 @@ function editEvent(event) {
   loadExtraFields(event.extra)
   loadNewsItems(event.news)
   eventImages.value = event.images || []
+  carouselImages.value = (event.carousel_images || []).map(img => ({ url: img.url, description: img.description || '', source_url: img.source_url || '' }))
 
   // Store points for map picker
   if (event.points && event.points.coordinates && event.points.coordinates.length > 0) {
@@ -381,11 +407,20 @@ async function saveEvent() {
       }
     })
 
+  const carouselImgs = carouselImages.value
+    .filter(img => img.url.trim())
+    .map(img => ({
+      url: img.url.trim(),
+      description: img.description.trim() || undefined,
+      source_url: img.source_url.trim() || undefined,
+    }))
+
   const payload = {
     title: form.title,
     date: new Date(form.date).toISOString(),
     points: points ? { type: 'MultiPoint', coordinates: points } : null,
     extra: Object.keys(extra).length > 0 ? extra : null,
+    carousel_images: carouselImgs.length > 0 ? carouselImgs : undefined,
     news: news.length > 0 ? news : null,
   }
 
@@ -866,6 +901,42 @@ body {
 .image-item button {
   padding: 0.25rem 0.5rem;
   font-size: 0.75rem;
+}
+
+.carousel-images-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.carousel-image-row {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.carousel-url-input {
+  flex: 2;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+}
+
+.carousel-desc-input {
+  flex: 1.5;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+}
+
+.carousel-source-input {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
 }
 
 .upload-form {
