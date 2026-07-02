@@ -89,8 +89,9 @@
                 <img :src="carouselImages[carouselIndex].url" alt="Event image" class="carousel-image" @click="lightboxUrl = carouselImages[carouselIndex].url" />
               </div>
               <div class="carousel-meta">
-                <p v-if="carouselImages[carouselIndex].description" class="carousel-description">{{ carouselImages[carouselIndex].description }}</p>
-                <a v-if="carouselImages[carouselIndex].source_url" :href="carouselImages[carouselIndex].source_url" target="_blank" rel="noopener noreferrer" class="carousel-source-link">View source ↗</a>
+                <a v-if="carouselImages[carouselIndex].source_url && carouselImages[carouselIndex].description" :href="carouselImages[carouselIndex].source_url" target="_blank" rel="noopener noreferrer" class="carousel-description-link">{{ carouselImages[carouselIndex].description }}</a>
+                <p v-else-if="carouselImages[carouselIndex].description" class="carousel-description">{{ carouselImages[carouselIndex].description }}</p>
+                <a v-if="carouselImages[carouselIndex].source_url && !carouselImages[carouselIndex].description" :href="carouselImages[carouselIndex].source_url" target="_blank" rel="noopener noreferrer" class="carousel-source-link">View source ↗</a>
               </div>
               <div class="carousel-controls">
                 <button class="carousel-btn" @click="prevCarousel" :disabled="carouselIndex === 0">←</button>
@@ -822,11 +823,21 @@ html, body {
   text-decoration: underline;
 }
 
-.carousel-description {
+.carousel-description,
+.carousel-description-link {
   margin-top: 0.35rem;
   font-size: 0.85rem;
   opacity: 0.85;
   line-height: 1.4;
+}
+
+.carousel-description-link {
+  color: #4ade80;
+  text-decoration: none;
+}
+
+.carousel-description-link:hover {
+  text-decoration: underline;
 }
 
 .carousel-controls {
