@@ -86,7 +86,7 @@
             <span class="detail-label">Images</span>
             <div class="carousel">
               <div class="carousel-image-wrapper">
-                <img :src="carouselImages[carouselIndex].url" alt="Event image" class="carousel-image" />
+                <img :src="carouselImages[carouselIndex].url" alt="Event image" class="carousel-image" @click="lightboxUrl = carouselImages[carouselIndex].url" />
               </div>
               <div class="carousel-meta">
                 <p v-if="carouselImages[carouselIndex].description" class="carousel-description">{{ carouselImages[carouselIndex].description }}</p>
@@ -132,6 +132,13 @@
         </ul>
       </template>
     </aside>
+
+    <div v-if="lightboxUrl" class="lightbox" @click.self="lightboxUrl = null">
+      <div class="lightbox-content">
+        <img :src="lightboxUrl" class="lightbox-image" />
+      </div>
+      <button class="lightbox-close" @click="lightboxUrl = null">×</button>
+    </div>
   </div>
 </template>
 
@@ -159,6 +166,7 @@ let imageOverlays = {}
 const showRaster = ref({})
 const carouselIndex = ref(0)
 const carouselImages = computed(() => selectedEvent.value?.carousel_images || [])
+const lightboxUrl = ref(null)
 
 const isPlaying = ref(false)
 const activeIndex = ref(0)
@@ -219,6 +227,10 @@ onMounted(async () => {
   }).addTo(map)
 
   showAllMarkers()
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') lightboxUrl.value = null
+  })
 })
 
 function showAllMarkers() {
@@ -975,5 +987,45 @@ html, body {
   display: block;
   font-size: 0.8rem;
   opacity: 0.9;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  cursor: pointer;
+}
+
+.lightbox-content {
+  width: 90vw;
+  height: 90vh;
+}
+
+.lightbox-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  cursor: default;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 1rem;
+  right: 1.5rem;
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 2.5rem;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.lightbox-close:hover {
+  opacity: 1;
 }
 </style>
