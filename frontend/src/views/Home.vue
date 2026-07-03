@@ -51,28 +51,88 @@
         <h2 class="event-detail-title">{{ selectedEvent.title }}</h2>
 
         <div class="event-detail">
-          <div class="detail-row">
-            <span class="detail-label">Date</span>
-            <span class="detail-value">{{ formatDate(selectedEvent.date) }}</span>
-          </div>
-
-          <div v-if="selectedEvent.points && selectedEvent.points.coordinates" class="detail-row">
-            <span class="detail-label">Coordinates</span>
-            <span class="detail-value">
-              {{ selectedEvent.points.coordinates.map(c => `${c[1]}, ${c[0]}`).join('; ') }}
-            </span>
-          </div>
-
-          <div v-if="selectedEvent.extra && Object.keys(selectedEvent.extra).length > 0" class="detail-extra">
-            <span class="detail-label">Extra Info</span>
-            <div v-for="(value, key) in selectedEvent.extra" :key="key" class="extra-item">
-              <span class="extra-key">{{ key }}:</span>
-              <span class="extra-value">{{ value }}</span>
+          <section class="detail-section detail-section-hero">
+            <div class="detail-row">
+              <span class="detail-label">Date</span>
+              <span class="detail-value">{{ formatDate(selectedEvent.date) }}</span>
             </div>
-          </div>
 
-          <div v-if="selectedEvent.images && selectedEvent.images.length > 0" class="detail-images">
-            <span class="detail-label">Satellite Images</span>
+            <div v-if="selectedEvent.points && selectedEvent.points.coordinates" class="detail-row">
+              <div class="detail-heading-row">
+                <span class="detail-label">Coordinates</span>
+                <span class="detail-badge">{{ selectedEvent.points.coordinates.length }} point{{ selectedEvent.points.coordinates.length > 1 ? 's' : '' }}</span>
+              </div>
+              <div class="coordinate-list">
+                <div v-for="(coord, index) in selectedEvent.points.coordinates" :key="`${coord[0]}-${coord[1]}-${index}`" class="coordinate-chip">
+                  {{ formatCoordinate(coord) }}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section v-if="hasPrimitiveExtra" class="detail-section">
+            <div class="detail-heading-row">
+              <span class="detail-label">Key Facts</span>
+              <span class="detail-badge">{{ primitiveExtraEntries.length }}</span>
+            </div>
+            <div class="fact-grid">
+              <div v-for="([key, value]) in primitiveExtraEntries" :key="key" class="fact-card">
+                <span class="fact-key">{{ formatLabel(key) }}</span>
+                <span class="fact-value">{{ formatPrimitive(value) }}</span>
+              </div>
+            </div>
+          </section>
+
+          <section v-if="hasStructuredExtra" class="detail-section">
+            <details class="structured-details">
+              <summary class="structured-summary">
+                <span class="detail-label">Structured Data</span>
+                <span class="detail-badge">{{ structuredExtraEntries.length }} section{{ structuredExtraEntries.length > 1 ? 's' : '' }}</span>
+              </summary>
+
+              <div class="structured-groups">
+                <div v-for="([key, value]) in structuredExtraEntries" :key="key" class="structured-group">
+                  <div class="structured-group-header">
+                    <span class="structured-group-title">{{ formatLabel(key) }}</span>
+                    <span class="structured-group-meta">{{ summarizeStructuredValue(value) }}</span>
+                  </div>
+
+                  <div v-if="isPrimitiveArray(value)" class="structured-list">
+                    <div v-for="(item, index) in value" :key="`${key}-${index}`" class="structured-pill">
+                      {{ formatPrimitive(item) }}
+                    </div>
+                  </div>
+
+                  <div v-else-if="isObjectArray(value)" class="structured-stack">
+                    <div v-for="(item, index) in value" :key="`${key}-${index}`" class="structured-card">
+                      <div class="structured-card-index">{{ key.slice(0, -1) || 'item' }} {{ index + 1 }}</div>
+                      <div v-for="(childValue, childKey) in item" :key="`${key}-${index}-${childKey}`" class="structured-row">
+                        <span class="structured-key">{{ formatLabel(childKey) }}</span>
+                        <span v-if="isPrimitive(childValue)" class="structured-value">{{ formatPrimitive(childValue) }}</span>
+                        <div v-else class="structured-json">{{ formatJson(childValue) }}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div v-else-if="isPlainObject(value)" class="structured-card">
+                    <div v-for="(childValue, childKey) in value" :key="`${key}-${childKey}`" class="structured-row">
+                      <span class="structured-key">{{ formatLabel(childKey) }}</span>
+                      <span v-if="isPrimitive(childValue)" class="structured-value">{{ formatPrimitive(childValue) }}</span>
+                      <div v-else class="structured-json">{{ formatJson(childValue) }}</div>
+                    </div>
+                  </div>
+
+                  <div v-else class="structured-json">{{ formatJson(value) }}</div>
+                </div>
+              </div>
+            </details>
+          </section>
+
+          <div v-if="selectedEvent.images && selectedEvent.images.length > 0" class="detail-section detail-images">
+            <div class="detail-heading-row">
+              <span class="detail-label">Satellite Images</span>
+              <span class="detail-badge">{{ selectedEvent.images.length }}</span>
+            </div>
             <div v-for="img in selectedEvent.images" :key="img.filename" class="image-item">
               <label class="toggle-switch">
                 <input type="checkbox" v-model="showRaster[img.filename]" @change="toggleRaster(img)" />
@@ -86,8 +146,11 @@
             </div>
           </div>
 
-          <div v-if="selectedEvent.carousel_images && selectedEvent.carousel_images.length > 0" class="detail-carousel">
-            <span class="detail-label">Images</span>
+          <div v-if="selectedEvent.carousel_images && selectedEvent.carousel_images.length > 0" class="detail-section detail-carousel">
+            <div class="detail-heading-row">
+              <span class="detail-label">Images</span>
+              <span class="detail-badge">{{ selectedEvent.carousel_images.length }}</span>
+            </div>
             <div class="carousel">
               <div class="carousel-image-wrapper">
                 <img :src="carouselImages[carouselIndex].url" alt="Event image" class="carousel-image" @click="lightboxUrl = carouselImages[carouselIndex].url" />
@@ -105,8 +168,11 @@
             </div>
           </div>
 
-          <div v-if="selectedEvent.news && selectedEvent.news.length > 0" class="detail-news">
-            <span class="detail-label">Related News</span>
+          <div v-if="selectedEvent.news && selectedEvent.news.length > 0" class="detail-section detail-news">
+            <div class="detail-heading-row">
+              <span class="detail-label">Related News</span>
+              <span class="detail-badge">{{ selectedEvent.news.length }}</span>
+            </div>
             <div v-for="(item, i) in selectedEvent.news" :key="i" class="news-item">
               <a v-if="item.url" :href="item.url" target="_blank" rel="noopener noreferrer" class="news-link">
                 <span class="news-title">{{ item.title }}</span>
@@ -115,9 +181,10 @@
               <span v-else class="news-title">{{ item.title }}</span>
               <span v-if="item.author" class="news-author">— {{ item.author }}</span>
               <div v-if="item.extra && Object.keys(item.extra).length > 0" class="news-extra">
-                <div v-for="(value, key) in item.extra" :key="key" class="extra-item">
-                  <span class="extra-key">{{ key }}:</span>
-                  <span class="extra-value">{{ value }}</span>
+                <div v-for="(value, key) in item.extra" :key="key" class="structured-row">
+                  <span class="structured-key">{{ formatLabel(key) }}</span>
+                  <span v-if="isPrimitive(value)" class="structured-value">{{ formatPrimitive(value) }}</span>
+                  <div v-else class="structured-json">{{ formatJson(value) }}</div>
                 </div>
               </div>
             </div>
@@ -211,6 +278,15 @@ const carouselImages = computed(() => selectedEvent.value?.carousel_images || []
 const lightboxUrl = ref(null)
 const chatOpen = ref(false)
 const refreshStatus = ref('Idle')
+const selectedExtraEntries = computed(() => Object.entries(selectedEvent.value?.extra || {}))
+const primitiveExtraEntries = computed(() =>
+  selectedExtraEntries.value.filter(([, value]) => isPrimitive(value)),
+)
+const structuredExtraEntries = computed(() =>
+  selectedExtraEntries.value.filter(([, value]) => !isPrimitive(value)),
+)
+const hasPrimitiveExtra = computed(() => primitiveExtraEntries.value.length > 0)
+const hasStructuredExtra = computed(() => structuredExtraEntries.value.length > 0)
 
 const isPlaying = ref(false)
 const activeIndex = ref(0)
@@ -234,6 +310,56 @@ const chatOriginLabel = computed(() => {
     return 'embedded chat'
   }
 })
+
+function isPrimitive(value) {
+  return value === null || ['string', 'number', 'boolean'].includes(typeof value)
+}
+
+function isPrimitiveArray(value) {
+  return Array.isArray(value) && value.every(item => isPrimitive(item))
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function isObjectArray(value) {
+  return Array.isArray(value) && value.every(item => isPlainObject(item))
+}
+
+function formatPrimitive(value) {
+  if (value === null) return 'None'
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  return String(value)
+}
+
+function formatLabel(value) {
+  return String(value)
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, char => char.toUpperCase())
+}
+
+function formatJson(value) {
+  return JSON.stringify(value, null, 2)
+}
+
+function summarizeStructuredValue(value) {
+  if (isPrimitiveArray(value)) {
+    return `${value.length} item${value.length === 1 ? '' : 's'}`
+  }
+  if (isObjectArray(value)) {
+    return `${value.length} record${value.length === 1 ? '' : 's'}`
+  }
+  if (isPlainObject(value)) {
+    const count = Object.keys(value).length
+    return `${count} field${count === 1 ? '' : 's'}`
+  }
+  return 'structured'
+}
+
+function formatCoordinate(coord) {
+  return `${Number(coord[1]).toFixed(4)}, ${Number(coord[0]).toFixed(4)}`
+}
 
 const filteredEvents = computed(() => {
   return events.value.filter(e => {
@@ -1008,10 +1134,21 @@ html, body {
   gap: 1rem;
 }
 
+.detail-section {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 1rem;
+}
+
+.detail-section-hero {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .detail-row {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.35rem;
 }
 
 .detail-label {
@@ -1025,39 +1162,196 @@ html, body {
   font-size: 0.95rem;
 }
 
-.detail-extra {
-  margin-top: 0.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.4);
-}
-
-.extra-item {
+.detail-heading-row {
   display: flex;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
 }
 
-.extra-key {
+.detail-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.72rem;
   font-weight: 600;
 }
 
-.detail-images {
-  margin-top: 0.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.4);
+.coordinate-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
-.detail-news {
-  margin-top: 0.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.4);
+.coordinate-chip {
+  padding: 0.45rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 0.84rem;
+  line-height: 1.2;
+}
+
+.fact-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.fact-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.fact-key {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.75;
+  font-weight: 700;
+}
+
+.fact-value {
+  font-size: 0.95rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.structured-details {
+  width: 100%;
+}
+
+.structured-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.structured-summary::-webkit-details-marker {
+  display: none;
+}
+
+.structured-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: 0.95rem;
+}
+
+.structured-group {
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.structured-group:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.structured-group-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.structured-group-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.structured-group-meta {
+  font-size: 0.74rem;
+  opacity: 0.72;
+  text-transform: uppercase;
+}
+
+.structured-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.structured-pill {
+  padding: 0.4rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 0.82rem;
+}
+
+.structured-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.structured-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.85rem;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.structured-card-index {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 700;
+  opacity: 0.72;
+}
+
+.structured-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.structured-key {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.72;
+  font-weight: 600;
+}
+
+.structured-value {
+  font-size: 0.94rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.structured-json {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  padding: 0.7rem 0.8rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  font-family: "IBM Plex Mono", monospace;
 }
 
 .news-item {
-  margin-top: 0.75rem;
+  margin-top: 0.8rem;
   padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.14);
+  border-radius: 12px;
 }
 
 .news-title {
@@ -1093,7 +1387,7 @@ html, body {
 }
 
 .detail-carousel {
-  margin-top: 1rem;
+  gap: 0.75rem;
 }
 
 .carousel {
