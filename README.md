@@ -81,8 +81,10 @@ cd frontend && npm run dev
 | `/api/events/{id}` | GET | JWT | Get single event |
 | `/api/events/{id}` | PUT | JWT | Update event |
 | `/api/events/{id}` | DELETE | JWT | Delete event |
-| `/api/events/{id}/images` | POST | JWT | Upload image |
-| `/api/events/{id}/images` | GET | JWT | List images |
+| `/api/events/{id}/images` | POST | JWT | Upload georeferenced satellite image |
+| `/api/events/{id}/images` | GET | JWT | List uploaded satellite images |
+| `/api/events/{id}/satellite-images` | POST | JWT | Alias for uploading georeferenced satellite images |
+| `/api/events/{id}/satellite-images` | GET | JWT | Alias for listing uploaded satellite images |
 | `/api/public/events` | GET | None | Public read-only |
 
 ### Event Schema
@@ -127,6 +129,10 @@ cd frontend && npm run dev
   ]
 }
 ```
+
+Vocabulary:
+- `images`: georeferenced satellite/raster overlays uploaded through the image upload endpoint and positioned on the map with `bounds`
+- `carousel_images`: photos and other non-georeferenced reference images shown alongside event analysis
 
 ### Upload Validation
 

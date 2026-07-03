@@ -7,7 +7,7 @@ from slowapi.errors import RateLimitExceeded
 import mongoengine
 import os
 
-from schemas import CarouselImage, EventCreate, EventOut, LoginRequest, TokenResponse
+from schemas import CarouselImage, EventCreate, EventOut, EventUpdate, LoginRequest, TokenResponse
 from models import Event
 from auth import create_access_token, verify_password, admin_password, get_admin_token
 from services import events as event_service
@@ -68,17 +68,13 @@ def store_event(event: EventCreate, _=Depends(get_admin_token)):
 
 
 @app.put("/api/events/{event_id}", response_model=EventOut)
-def update_event(event_id: str, event: EventCreate, _=Depends(get_admin_token)):
-    return event_service.update_event(
-        event_id=event_id,
-        title=event.title,
-        date=event.date,
-        points=event.points,
-        extra=event.extra,
-        images=event.images,
-        carousel_images=[c.model_dump() for c in event.carousel_images] if event.carousel_images else None,
-        news=[n.model_dump() for n in event.news] if event.news else None,
-    )
+def update_event(event_id: str, event: EventUpdate, _=Depends(get_admin_token)):
+    payload = event.model_dump(exclude_unset=True)
+    if "carousel_images" in payload:
+        payload["carousel_images"] = [c.model_dump() for c in event.carousel_images] if event.carousel_images else []
+    if "news" in payload:
+        payload["news"] = [n.model_dump() for n in event.news] if event.news else []
+    return event_service.update_event(event_id=event_id, **payload)
 
 
 @app.delete("/api/events/{event_id}", status_code=204)
@@ -98,8 +94,7 @@ except OSError:
     pass
 
 
-@app.post("/api/events/{event_id}/images")
-async def upload_image(
+async def _upload_satellite_image(
     event_id: str,
     file: UploadFile = File(...),
     name: str = Form(...),
@@ -117,12 +112,43 @@ async def upload_image(
         bounds=parsed_bounds,
         filename=file.filename,
     )
+    return image_data
+
+
+@app.post("/api/events/{event_id}/images")
+async def upload_image(
+    event_id: str,
+    file: UploadFile = File(...),
+    name: str = Form(...),
+    image_type: str = Form("optical"),
+    bounds: str = Form(None),
+    _=Depends(get_admin_token),
+):
+    image_data = await _upload_satellite_image(event_id, file, name, image_type, bounds, _)
     return {"status": "ok", "image": image_data}
+
+
+@app.post("/api/events/{event_id}/satellite-images")
+async def upload_satellite_image(
+    event_id: str,
+    file: UploadFile = File(...),
+    name: str = Form(...),
+    image_type: str = Form("optical"),
+    bounds: str = Form(None),
+    _=Depends(get_admin_token),
+):
+    image_data = await _upload_satellite_image(event_id, file, name, image_type, bounds, _)
+    return {"status": "ok", "satellite_image": image_data}
 
 
 @app.get("/api/events/{event_id}/images")
 def get_event_images(event_id: str, _=Depends(get_admin_token)):
     return {"images": image_service.get_event_images(event_id)}
+
+
+@app.get("/api/events/{event_id}/satellite-images")
+def get_satellite_images(event_id: str, _=Depends(get_admin_token)):
+    return {"satellite_images": image_service.get_event_images(event_id)}
 
 
 @app.get("/api/public/events", response_model=list[EventOut])

@@ -61,6 +61,29 @@ def test_update_event(client):
     assert body["title"] == "Updated Title"
 
 
+def test_update_event_partial_payload(client):
+    """Test partial updates without resending unchanged required fields."""
+    payload = {
+        "title": "Original Title",
+        "date": "2026-07-15T19:00:00",
+        "points": {"type": "MultiPoint", "coordinates": [[7.0, 46.5]]},
+    }
+
+    resp = client.post("/api/events", json=payload)
+    event_id = resp.json()["id"]
+
+    update_payload = {
+        "points": {"type": "MultiPoint", "coordinates": [[8.0, 47.0], [8.1, 47.1]]},
+    }
+
+    resp = client.put(f"/api/events/{event_id}", json=update_payload)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["title"] == "Original Title"
+    assert body["date"] == "2026-07-15T19:00:00"
+    assert body["points"]["coordinates"] == [[8.0, 47.0], [8.1, 47.1]]
+
+
 def test_delete_event(client):
     """Test deleting an event."""
     payload = {
@@ -337,6 +360,30 @@ def test_get_event_images(client):
     assert body["images"][0]["name"] == "test image"
 
 
+def test_get_satellite_images_alias(client):
+    """Test retrieving uploaded satellite images via the clearer alias endpoint."""
+    resp = client.post("/api/events", json={
+        "title": "Satellite Alias",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+    })
+    event_id = resp.json()["id"]
+
+    png_content = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
+    client.post(
+        f"/api/events/{event_id}/satellite-images",
+        files={"file": ("test.png", png_content, "image/png")},
+        data={"name": "sat overlay", "image_type": "optical", "bounds": "6.0,46.0,8.0,47.0"},
+    )
+
+    resp = client.get(f"/api/events/{event_id}/satellite-images")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "satellite_images" in body
+    assert len(body["satellite_images"]) == 1
+    assert body["satellite_images"][0]["name"] == "sat overlay"
+
+
 def test_get_event_images_not_found(client):
     """Test that get_event_images returns 404 for non-existent event."""
     resp = client.get("/api/events/000000000000000000000000/images")
@@ -344,7 +391,7 @@ def test_get_event_images_not_found(client):
 
 
 def test_format_points_returns_none_for_empty(client):
-    """Test that empty points are normalized to None."""
+    """Test that empty points dicts are rejected."""
     payload = {
         "title": "Empty Points",
         "date": "2026-07-15T19:00:00",
@@ -352,13 +399,11 @@ def test_format_points_returns_none_for_empty(client):
     }
 
     resp = client.post("/api/events", json=payload)
-    assert resp.status_code == 201
-    body = resp.json()
-    assert body["points"] is None
+    assert resp.status_code == 422
 
 
 def test_format_points_returns_none_for_invalid_dict(client):
-    """Test that points dict without coordinates returns None."""
+    """Test that points dict without coordinates is rejected."""
     payload = {
         "title": "Invalid Dict Points",
         "date": "2026-07-15T19:00:00",
@@ -366,9 +411,19 @@ def test_format_points_returns_none_for_invalid_dict(client):
     }
 
     resp = client.post("/api/events", json=payload)
-    assert resp.status_code == 201
-    body = resp.json()
-    assert body["points"] is None
+    assert resp.status_code == 422
+
+
+def test_create_event_rejects_non_numeric_coordinates(client):
+    """Test that non-numeric coordinates are rejected."""
+    payload = {
+        "title": "Invalid Coordinates",
+        "date": "2026-07-15T19:00:00",
+        "points": {"type": "MultiPoint", "coordinates": [["west", "north"]]},
+    }
+
+    resp = client.post("/api/events", json=payload)
+    assert resp.status_code == 422
 
 
 def test_update_event_with_images(client):
@@ -432,6 +487,26 @@ def test_upload_with_bounds(client):
     body = resp.json()
     assert body["status"] == "ok"
     assert body["image"]["bounds"] == [6.0, 46.0, 8.0, 47.0]
+
+
+def test_upload_satellite_image_alias_with_bounds(client):
+    """Test the clearer satellite upload alias endpoint."""
+    resp = client.post("/api/events", json={
+        "title": "Satellite Upload Alias",
+        "date": "2026-07-15T19:00:00",
+        "points": None,
+    })
+    event_id = resp.json()["id"]
+
+    resp = client.post(
+        f"/api/events/{event_id}/satellite-images",
+        files={"file": ("test.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 100, "image/png")},
+        data={"name": "sentinel overlay", "image_type": "optical", "bounds": "6.0,46.0,8.0,47.0"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert body["satellite_image"]["bounds"] == [6.0, 46.0, 8.0, 47.0]
 
 
 def test_upload_rejects_tiff(client):
