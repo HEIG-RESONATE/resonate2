@@ -139,7 +139,7 @@
     </aside>
 
     <transition name="chat-drawer">
-      <div v-if="chatOpen" class="chat-shell">
+      <div v-show="chatOpen" class="chat-shell">
         <button class="chat-backdrop" @click="chatOpen = false" aria-label="Close chat"></button>
         <aside class="chat-drawer" aria-label="Agent chat">
           <div class="chat-header">
