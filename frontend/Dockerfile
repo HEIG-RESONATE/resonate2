@@ -2,6 +2,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+ARG VITE_CHAINLIT_URL
+ENV VITE_CHAINLIT_URL=${VITE_CHAINLIT_URL}
+
 COPY package.json ./
 
 RUN npm install
