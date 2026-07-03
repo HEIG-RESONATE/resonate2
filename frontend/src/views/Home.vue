@@ -1,5 +1,9 @@
 <template>
   <div class="home">
+    <button class="chat-toggle" :class="{ active: chatOpen }" @click="toggleChat">
+      {{ chatOpen ? 'Close chat' : 'Open chat' }}
+    </button>
+
     <div class="main-area">
       <div id="map"></div>
 
@@ -134,6 +138,40 @@
       </template>
     </aside>
 
+    <transition name="chat-drawer">
+      <div v-if="chatOpen" class="chat-shell">
+        <button class="chat-backdrop" @click="chatOpen = false" aria-label="Close chat"></button>
+        <aside class="chat-drawer" aria-label="Agent chat">
+          <div class="chat-header">
+            <div>
+              <p class="chat-eyebrow">Agent</p>
+              <h2 class="chat-title">Chat Assistant</h2>
+              <p class="chat-subtitle">
+                {{ selectedEvent ? `Context: ${selectedEvent.title}` : 'Monitoring event changes and refreshing the map automatically.' }}
+              </p>
+            </div>
+            <div class="chat-actions">
+              <button class="chat-action-btn" @click="refreshEvents">Refresh data</button>
+              <button class="chat-close-btn" @click="chatOpen = false" aria-label="Close chat">×</button>
+            </div>
+          </div>
+
+          <div class="chat-status">
+            <span>{{ refreshStatus }}</span>
+            <span class="chat-dot"></span>
+            <span>{{ chatOriginLabel }}</span>
+          </div>
+
+          <iframe
+            class="chat-frame"
+            :src="chatUrl"
+            title="Agent chat"
+            referrerpolicy="strict-origin-when-cross-origin"
+          ></iframe>
+        </aside>
+      </div>
+    </transition>
+
     <div v-if="lightboxUrl" class="lightbox" @click.self="lightboxUrl = null">
       <div class="lightbox-content">
         <img :src="lightboxUrl" class="lightbox-image" />
@@ -144,7 +182,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -158,6 +196,9 @@ L.Icon.Default.mergeOptions({
 
 const ITEM_WIDTH = 120
 const VISIBLE_COUNT = 5
+const CHAT_REFRESH_EVENT = 'resonate:refresh'
+const CHAT_REFRESH_POLL_MS = 15000
+const DEFAULT_CHAT_URL = 'http://localhost:8001'
 
 const events = ref([])
 const loading = ref(true)
@@ -168,13 +209,31 @@ const showRaster = ref({})
 const carouselIndex = ref(0)
 const carouselImages = computed(() => selectedEvent.value?.carousel_images || [])
 const lightboxUrl = ref(null)
+const chatOpen = ref(false)
+const refreshStatus = ref('Idle')
 
 const isPlaying = ref(false)
 const activeIndex = ref(0)
 let playInterval = null
+let chatRefreshInterval = null
 
 const filterFrom = ref('')
 const filterTo = ref('')
+const chatUrl = import.meta.env.VITE_CHAINLIT_URL || DEFAULT_CHAT_URL
+const chatOrigin = (() => {
+  try {
+    return new URL(chatUrl, window.location.origin).origin
+  } catch {
+    return window.location.origin
+  }
+})()
+const chatOriginLabel = computed(() => {
+  try {
+    return new URL(chatUrl, window.location.origin).host
+  } catch {
+    return 'embedded chat'
+  }
+})
 
 const filteredEvents = computed(() => {
   return events.value.filter(e => {
@@ -197,8 +256,69 @@ const trackOffset = computed(() => {
 
 watch(filterFrom, () => { activeIndex.value = 0; refreshMarkers() })
 watch(filterTo, () => { activeIndex.value = 0; refreshMarkers() })
+watch(chatOpen, (isOpen) => {
+  if (isOpen) {
+    refreshEvents()
+    startChatRefreshPolling()
+  } else {
+    stopChatRefreshPolling()
+  }
+})
+
+async function loadEvents() {
+  const res = await fetch('/api/public/events')
+  const data = await res.json()
+  events.value = data.sort((a, b) => new Date(a.date) - new Date(b.date))
+}
+
+async function refreshEvents() {
+  if (!map) return
+
+  refreshStatus.value = 'Refreshing map data...'
+
+  try {
+    await loadEvents()
+    syncSelectedEvent()
+    refreshStatus.value = `Updated ${new Date().toLocaleTimeString()}`
+  } catch (e) {
+    console.error('Failed to refresh events:', e)
+    refreshStatus.value = 'Refresh failed'
+  }
+}
+
+function syncSelectedEvent() {
+  if (!selectedEvent.value) {
+    refreshMarkers()
+    return
+  }
+
+  const updated = events.value.find(event => event.id === selectedEvent.value.id)
+  if (!updated) {
+    clearSelection()
+    return
+  }
+
+  const visibleRasters = Object.entries(showRaster.value)
+    .filter(([, isVisible]) => isVisible)
+    .map(([filename]) => filename)
+
+  selectedEvent.value = updated
+  carouselIndex.value = Math.min(carouselIndex.value, Math.max(carouselImages.value.length - 1, 0))
+  focusEventOnMap(updated)
+
+  if (updated.images?.length) {
+    visibleRasters.forEach(filename => {
+      const image = updated.images.find(item => item.filename === filename)
+      if (image) {
+        showRaster.value[filename] = true
+        toggleRaster(image)
+      }
+    })
+  }
+}
 
 function refreshMarkers() {
+  if (!map) return
   map.eachLayer(layer => {
     if (layer instanceof L.Marker) {
       map.removeLayer(layer)
@@ -212,9 +332,7 @@ function refreshMarkers() {
 
 onMounted(async () => {
   try {
-    const res = await fetch('/api/public/events')
-    const data = await res.json()
-    events.value = data.sort((a, b) => new Date(a.date) - new Date(b.date))
+    await loadEvents()
   } catch (e) {
     console.error('Failed to load events:', e)
   }
@@ -229,9 +347,15 @@ onMounted(async () => {
 
   showAllMarkers()
 
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') lightboxUrl.value = null
-  })
+  document.addEventListener('keydown', handleKeydown)
+  window.addEventListener('message', handleChatMessage)
+})
+
+onBeforeUnmount(() => {
+  stopTimeline()
+  stopChatRefreshPolling()
+  document.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('message', handleChatMessage)
 })
 
 function showAllMarkers() {
@@ -253,8 +377,12 @@ function showAllMarkers() {
 function selectEvent(event) {
   selectedEvent.value = event
   carouselIndex.value = 0
+  focusEventOnMap(event)
+}
 
-  // Clear existing markers and image overlay
+function focusEventOnMap(event) {
+  if (!map) return
+
   map.eachLayer(layer => {
     if (layer instanceof L.Marker) {
       map.removeLayer(layer)
@@ -262,7 +390,6 @@ function selectEvent(event) {
   })
   clearImageOverlay()
 
-  // Show only this event's markers
   if (event.points && event.points.coordinates) {
     const coords = []
     event.points.coordinates.forEach(coord => {
@@ -275,7 +402,6 @@ function selectEvent(event) {
     fitMapToCoords(coords)
   }
 
-  // Reset showRaster state for new event
   showRaster.value = {}
 }
 
@@ -400,25 +526,50 @@ function selectFilteredEvent(index) {
     activeIndex.value = index
     selectedEvent.value = event
     carouselIndex.value = 0
-    showRaster.value = {}
+    focusEventOnMap(event)
+  }
+}
 
-    map.eachLayer(layer => {
-      if (layer instanceof L.Marker) {
-        map.removeLayer(layer)
-      }
-    })
-    clearImageOverlay()
+function toggleChat() {
+  chatOpen.value = !chatOpen.value
+}
 
-    if (event.points && event.points.coordinates) {
-      const coords = []
-      event.points.coordinates.forEach(coord => {
-        L.marker([coord[1], coord[0]])
-          .bindPopup(`<strong>${event.title}</strong><br>${formatDate(event.date)}`)
-          .addTo(map)
-        coords.push([coord[1], coord[0]])
-      })
-      fitMapToCoords(coords)
-    }
+function startChatRefreshPolling() {
+  stopChatRefreshPolling()
+  chatRefreshInterval = window.setInterval(() => {
+    refreshEvents()
+  }, CHAT_REFRESH_POLL_MS)
+}
+
+function stopChatRefreshPolling() {
+  if (chatRefreshInterval) {
+    window.clearInterval(chatRefreshInterval)
+    chatRefreshInterval = null
+  }
+}
+
+function handleChatMessage(event) {
+  if (event.origin !== chatOrigin) return
+
+  const payload = typeof event.data === 'string'
+    ? event.data
+    : event.data?.type || event.data?.message
+
+  if (payload === CHAT_REFRESH_EVENT) {
+    refreshEvents()
+  }
+}
+
+function handleKeydown(event) {
+  if (event.key !== 'Escape') return
+
+  if (lightboxUrl.value) {
+    lightboxUrl.value = null
+    return
+  }
+
+  if (chatOpen.value) {
+    chatOpen.value = false
   }
 }
 
@@ -455,6 +606,7 @@ html, body {
   height: 100vh;
   width: 100%;
   overflow: hidden;
+  position: relative;
 }
 
 .main-area {
@@ -466,6 +618,165 @@ html, body {
 
 #map {
   flex: 1;
+}
+
+.chat-toggle {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1200;
+  border: none;
+  border-radius: 999px;
+  background: rgba(24, 34, 29, 0.9);
+  color: white;
+  padding: 0.8rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.chat-toggle:hover {
+  transform: translateY(-1px);
+  background: rgba(34, 51, 43, 0.96);
+}
+
+.chat-toggle.active {
+  background: #ffffff;
+  color: #1f3328;
+}
+
+.chat-shell {
+  position: absolute;
+  inset: 0;
+  z-index: 1300;
+  pointer-events: none;
+}
+
+.chat-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: rgba(6, 10, 8, 0.14);
+  backdrop-filter: blur(2px);
+  pointer-events: auto;
+}
+
+.chat-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(440px, calc(100vw - 2rem));
+  height: 100%;
+  background: #f4f2ea;
+  color: #17231d;
+  box-shadow: -18px 0 48px rgba(0, 0, 0, 0.22);
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+}
+
+.chat-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1rem 0.75rem;
+  border-bottom: 1px solid rgba(23, 35, 29, 0.1);
+}
+
+.chat-eyebrow {
+  margin: 0 0 0.3rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #516256;
+}
+
+.chat-title {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.chat-subtitle {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: #4d5d52;
+}
+
+.chat-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chat-action-btn,
+.chat-close-btn {
+  border: 1px solid rgba(23, 35, 29, 0.12);
+  background: white;
+  color: #17231d;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.chat-action-btn {
+  padding: 0.55rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.chat-close-btn {
+  width: 2.2rem;
+  height: 2.2rem;
+  font-size: 1.3rem;
+}
+
+.chat-status {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.55);
+  border-bottom: 1px solid rgba(23, 35, 29, 0.08);
+  font-size: 0.76rem;
+  color: #5f6e64;
+}
+
+.chat-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.chat-frame {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: white;
+}
+
+.chat-drawer-enter-active,
+.chat-drawer-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.chat-drawer-enter-active .chat-drawer,
+.chat-drawer-leave-active .chat-drawer {
+  transition: transform 0.25s ease;
+}
+
+.chat-drawer-enter-from,
+.chat-drawer-leave-to {
+  opacity: 0;
+}
+
+.chat-drawer-enter-from .chat-drawer,
+.chat-drawer-leave-to .chat-drawer {
+  transform: translateX(100%);
 }
 
 .timeline {
