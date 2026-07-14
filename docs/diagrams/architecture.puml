@@ -24,11 +24,10 @@ package "Data" {
 
 [Nginx] --> [Vue] : serves static files
 [Nginx] --> [API] : proxies /api/*
-[Nginx] --> [API] : proxies /images/*
 [Vue] --> [API] : REST API calls
 [API] --> [Auth] : JWT validation
 [API] --> [EventService] : event CRUD
-[API] --> [ImageService] : upload/processing
+[API] --> [ImageService] : upload, signing, secure serving
 [EventService] --> [ODM] : document operations
 [ImageService] --> [Images] : file storage
 [ODM] --> [Mongo] : queries

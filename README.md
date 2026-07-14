@@ -85,6 +85,7 @@ cd frontend && npm run dev
 | `/api/events/{id}/images` | GET | JWT | List uploaded satellite images |
 | `/api/events/{id}/satellite-images` | POST | JWT | Alias for uploading georeferenced satellite images |
 | `/api/events/{id}/satellite-images` | GET | JWT | Alias for listing uploaded satellite images |
+| `/api/events/{id}/satellite-images/{image_id}/access` | GET | JWT | Mint a short-lived URL for an image preview or original |
 | `/api/public/events` | GET | None | Public read-only |
 
 ### Event Schema
@@ -103,11 +104,13 @@ cd frontend && npm run dev
   },
   "images": [
     {
+      "id": "opaque-image-id",
       "filename": "string",
       "name": "string",
       "image_type": "optical|sar",
       "bounds": [west, south, east, north],
-      "preview": "string"
+      "preview": "string",
+      "content_type": "image/png"
     }
   ],
   "news": [
@@ -139,6 +142,27 @@ Vocabulary:
 - **Allowed types**: PNG, JPEG (detected by magic bytes)
 - **Max size**: 50MB
 - **Bounds**: Optional, user-provided `west,south,east,north` for map overlay positioning
+
+### Satellite-image access URLs
+
+Authenticated clients obtain an agent/browser-safe, short-lived URL with:
+
+```text
+GET /api/events/{event_id}/satellite-images/{image_id}/access?variant=preview
+```
+
+`variant` is `preview` (the default) or `original`. The response includes `image_id`,
+`event_id`, `variant`, `url`, `filename`, `content_type`, and an ISO-8601 `expires_at`.
+The URL is an opaque HMAC-signed backend URL, valid for five minutes by default
+(`IMAGE_ACCESS_TTL_SECONDS`, capped at 15 minutes), and does not expose a storage
+path, object key, bearer token, or credentials. It can be loaded without an admin
+bearer token until it expires. Uploaded PNG/JPEG files use the existing preview
+object; a missing preview returns `404 Preview not available`.
+
+Image metadata now always has an opaque `id`. Existing image records are migrated
+lazily: the first event or image-list read assigns UUIDs and saves them, so no manual
+migration is required. Do not treat `filename` or `preview` as a stable identifier or
+public URL.
 
 ## Project Structure
 

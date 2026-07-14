@@ -1,6 +1,5 @@
-from fastapi import Depends, FastAPI, HTTPException, UploadFile, File, Form, Request
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi import Depends, FastAPI, HTTPException, UploadFile, File, Form, Query, Request
+from fastapi.responses import FileResponse, JSONResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -82,18 +81,6 @@ def delete_event(event_id: str, _=Depends(get_admin_token)):
     event_service.delete_event(event_id)
 
 
-IMAGES_DIR = os.environ.get("IMAGES_DIR", "/app/images")
-
-try:
-    if os.path.isdir(IMAGES_DIR):
-        app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="images")
-    else:
-        os.makedirs(IMAGES_DIR, exist_ok=True)
-        app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="images")
-except OSError:
-    pass
-
-
 async def _upload_satellite_image(
     event_id: str,
     file: UploadFile = File(...),
@@ -149,6 +136,23 @@ def get_event_images(event_id: str, _=Depends(get_admin_token)):
 @app.get("/api/events/{event_id}/satellite-images")
 def get_satellite_images(event_id: str, _=Depends(get_admin_token)):
     return {"satellite_images": image_service.get_event_images(event_id)}
+
+
+@app.get("/api/events/{event_id}/satellite-images/{image_id}/access")
+def get_satellite_image_access(
+    event_id: str,
+    image_id: str,
+    request: Request,
+    variant: str = Query("preview", pattern="^(preview|original)$"),
+    _=Depends(get_admin_token),
+):
+    return image_service.get_image_access(event_id, image_id, variant, str(request.base_url))
+
+
+@app.get("/api/satellite-image-access/{token}")
+def serve_signed_satellite_image(token: str):
+    filepath, content_type = image_service.resolve_signed_image(token)
+    return FileResponse(filepath, media_type=content_type)
 
 
 @app.get("/api/public/events", response_model=list[EventOut])

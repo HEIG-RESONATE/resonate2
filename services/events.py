@@ -48,13 +48,17 @@ def format_news(news) -> Optional[list]:
 
 
 def doc_to_event_out(doc: Event) -> EventOut:
+    # Legacy and API-supplied image metadata is normalized on read so every
+    # satellite image has an opaque ID before it is returned to a client.
+    from services.images import ensure_image_ids
+
     return EventOut(
         id=str(doc.id),
         title=doc.title,
         date=doc.date.isoformat(),
         points=format_points(doc.points),
         extra=doc.extra,
-        images=doc.images,
+        images=ensure_image_ids(doc),
         carousel_images=doc.carousel_images,
         news=format_news(doc.news),
     )
