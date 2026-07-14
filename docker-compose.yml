@@ -23,6 +23,7 @@ services:
       - "8080:80"
     volumes:
       - ./frontend:/app
+      - ./frontend/.htpasswd:/etc/nginx/.htpasswd:ro
     depends_on:
       - api
 
