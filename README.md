@@ -164,6 +164,12 @@ lazily: the first event or image-list read assigns UUIDs and saves them, so no m
 migration is required. Do not treat `filename` or `preview` as a stable identifier or
 public URL.
 
+The map UI also loads existing PNG/JPEG overlays through `/images/{preview}`. In the
+Compose deployment, this stable overlay path is protected by the frontend's Nginx
+Basic Auth layer; the API's host port is bound to `127.0.0.1` so it cannot bypass that
+proxy from the network. Agent and Chainlit integrations should continue to use the
+short-lived access endpoint instead.
+
 ## Project Structure
 
 ```

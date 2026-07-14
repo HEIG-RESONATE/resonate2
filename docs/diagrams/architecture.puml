@@ -24,6 +24,7 @@ package "Data" {
 
 [Nginx] --> [Vue] : serves static files
 [Nginx] --> [API] : proxies /api/*\n(signed image URLs are public, short-lived)
+[Nginx] --> [API] : proxies /images/*\n(Basic Auth protected map overlays)
 [Vue] --> [API] : REST API calls
 [API] --> [Auth] : JWT validation
 [API] --> [EventService] : event CRUD

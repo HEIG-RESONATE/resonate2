@@ -38,16 +38,16 @@ def setup_mongo():
     mongoengine.disconnect()
 
 
-@pytest.fixture(autouse=True)
-def set_images_dir(tmp_path):
-    """Use a temp directory for image uploads during tests."""
-    os.environ["IMAGES_DIR"] = str(tmp_path / "images")
+@pytest.fixture(scope="session", autouse=True)
+def set_images_dir(tmp_path_factory):
+    """Use one temp directory because FastAPI mounts static files once per process."""
+    os.environ["IMAGES_DIR"] = str(tmp_path_factory.mktemp("images") / "uploads")
     yield
     os.environ.pop("IMAGES_DIR", None)
 
 
 @pytest.fixture(autouse=True)
-def reset_rate_limiter():
+def reset_rate_limiter(set_images_dir):
     """Reset the rate limiter between tests."""
     from main import limiter
     limiter._storage.reset()

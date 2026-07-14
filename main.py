@@ -1,5 +1,6 @@
 from fastapi import Depends, FastAPI, HTTPException, UploadFile, File, Form, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -79,6 +80,18 @@ def update_event(event_id: str, event: EventUpdate, _=Depends(get_admin_token)):
 @app.delete("/api/events/{event_id}", status_code=204)
 def delete_event(event_id: str, _=Depends(get_admin_token)):
     event_service.delete_event(event_id)
+
+
+# Leaflet overlays use stable /images/<filename> paths. External access is
+# protected by the frontend Nginx Basic Auth layer; Docker binds the API port
+# to localhost so this route is not directly exposed on the host network.
+IMAGES_DIR = os.environ.get("IMAGES_DIR", "/app/images")
+
+try:
+    os.makedirs(IMAGES_DIR, exist_ok=True)
+    app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="images")
+except OSError:
+    pass
 
 
 async def _upload_satellite_image(

@@ -285,6 +285,24 @@ def test_upload_accepts_valid_png(client):
     assert body["image"]["filename"].endswith("_test.png")
 
 
+def test_uploaded_image_remains_available_to_map_overlays(client):
+    """The UI's Leaflet overlay URL can retrieve the uploaded preview file."""
+    event = client.post("/api/events", json={
+        "title": "Overlay", "date": "2026-07-15T19:00:00",
+    }).json()
+    content = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
+    upload = client.post(
+        f"/api/events/{event['id']}/images",
+        files={"file": ("overlay.png", content, "image/png")},
+        data={"name": "overlay", "image_type": "optical"},
+    )
+
+    response = client.get(f"/images/{upload.json()['image']['preview']}")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("image/png")
+    assert response.content == content
+
+
 def test_login_rate_limit(client):
     """Test that login endpoint enforces rate limiting."""
     for _ in range(15):
