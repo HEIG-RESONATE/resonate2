@@ -85,7 +85,7 @@ cd frontend && npm run dev
 | `/api/events/{id}/images` | GET | JWT | List uploaded satellite images |
 | `/api/events/{id}/satellite-images` | POST | JWT | Alias for uploading georeferenced satellite images |
 | `/api/events/{id}/satellite-images` | GET | JWT | Alias for listing uploaded satellite images |
-| `/api/events/{id}/satellite-images/{image_id}/access` | GET | JWT | Mint a short-lived URL for an image preview or original |
+| `/api/events/{id}/satellite-images/{image_id}/access` | GET | JWT | Resolve an image preview or original to its overlay URL path |
 | `/api/public/events` | GET | None | Public read-only |
 
 Event-list endpoints accept `sort_by=date|added` and `direction=asc|desc`. Each
@@ -150,30 +150,27 @@ Vocabulary:
 
 ### Satellite-image access URLs
 
-Authenticated clients obtain an agent/browser-safe, short-lived URL with:
+Authenticated clients can resolve an image to the stable overlay URL path with:
 
 ```text
 GET /api/events/{event_id}/satellite-images/{image_id}/access?variant=preview
 ```
 
 `variant` is `preview` (the default) or `original`. The response includes `image_id`,
-`event_id`, `variant`, `url`, `filename`, `content_type`, and an ISO-8601 `expires_at`.
-The URL is an opaque HMAC-signed backend URL, valid for five minutes by default
-(`IMAGE_ACCESS_TTL_SECONDS`, capped at 15 minutes), and does not expose a storage
-path, object key, bearer token, or credentials. It can be loaded without an admin
-bearer token until it expires. Uploaded PNG/JPEG files use the existing preview
-object; a missing preview returns `404 Preview not available`.
+`event_id`, `variant`, `url_path`, `filename`, and `content_type`. `url_path` is a
+safe, relative `/images/{preview}` path. API adapters prepend their configured public
+Resonate UI origin before returning a browser URL. Uploaded PNG/JPEG files use the
+existing preview object; a missing preview returns `404 Preview not available`.
 
 Image metadata now always has an opaque `id`. Existing image records are migrated
 lazily: the first event or image-list read assigns UUIDs and saves them, so no manual
-migration is required. Do not treat `filename` or `preview` as a stable identifier or
-public URL.
+migration is required. Use the opaque image `id` as the identifier.
 
 The map UI also loads existing PNG/JPEG overlays through `/images/{preview}`. In the
 Compose deployment, this stable overlay path is protected by the frontend's Nginx
 Basic Auth layer; the API's host port is bound to `127.0.0.1` so it cannot bypass that
-proxy from the network. Agent and Chainlit integrations should continue to use the
-short-lived access endpoint instead.
+proxy from the network. Agent and Chainlit integrations can obtain the same path via
+the authenticated access endpoint and prepend their public UI origin.
 
 ## Project Structure
 

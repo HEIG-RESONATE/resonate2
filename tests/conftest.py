@@ -47,7 +47,7 @@ def set_images_dir(tmp_path_factory):
 
 
 @pytest.fixture(autouse=True)
-def reset_rate_limiter(set_images_dir):
+def reset_rate_limiter(setup_mongo, set_images_dir):
     """Reset the rate limiter between tests."""
     from main import limiter
     limiter._storage.reset()

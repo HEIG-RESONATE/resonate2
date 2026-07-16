@@ -1,6 +1,3 @@
-from datetime import datetime, timezone
-from urllib.parse import urlsplit
-
 from fastapi.testclient import TestClient
 
 
@@ -431,8 +428,8 @@ def test_get_satellite_images_alias(client):
     assert body["satellite_images"][0]["name"] == "sat overlay"
 
 
-def test_satellite_image_access_returns_short_lived_urls_and_browser_preview(client):
-    """An authenticated admin can mint opaque, signed URLs for both variants."""
+def test_satellite_image_access_returns_overlay_path_and_browser_preview(client):
+    """An authenticated admin can resolve both variants to the map overlay path."""
     event = client.post("/api/events", json={
         "title": "Image access", "date": "2026-07-15T19:00:00",
     }).json()
@@ -458,13 +455,13 @@ def test_satellite_image_access_returns_short_lived_urls_and_browser_preview(cli
     assert body["variant"] == "preview"
     assert body["filename"].endswith("_secret-source.png")
     assert body["content_type"] == "image/png"
-    assert datetime.fromisoformat(body["expires_at"].replace("Z", "+00:00")) > datetime.now(timezone.utc)
-    assert "secret-source.png" not in body["url"]
-    assert client.token not in body["url"]
+    assert body["url_path"] == f"/images/{uploaded['preview']}"
+    assert "url" not in body
+    assert "expires_at" not in body
 
     from main import app
 
-    browser_preview = TestClient(app).get(urlsplit(body["url"]).path + "?" + urlsplit(body["url"]).query)
+    browser_preview = TestClient(app).get(body["url_path"])
     assert browser_preview.status_code == 200
     assert browser_preview.headers["content-type"].startswith("image/png")
     assert browser_preview.content == png_content
@@ -475,6 +472,7 @@ def test_satellite_image_access_returns_short_lived_urls_and_browser_preview(cli
     assert original.status_code == 200
     assert original.json()["variant"] == "original"
     assert original.json()["content_type"] == "image/png"
+    assert original.json()["url_path"] == f"/images/{uploaded['filename']}"
 
 
 def test_satellite_image_access_hides_missing_and_cross_event_images(client):
@@ -509,22 +507,6 @@ def test_satellite_image_access_requires_auth_and_rejects_invalid_variant(client
     event = client.post("/api/events", json={"title": "Variant", "date": "2026-07-15T19:00:00"}).json()
     response = client.get(f"/api/events/{event['id']}/satellite-images/x/access?variant=unsafe")
     assert response.status_code == 422
-
-
-def test_signed_satellite_image_url_rejects_tampering_and_expiry(client):
-    """The browser URL is usable without a bearer token only while signed and live."""
-    from main import app
-    from services.images import _encode_access_token
-
-    expired = _encode_access_token({
-        "event_id": "000000000000000000000000",
-        "image_id": "image",
-        "variant": "preview",
-        "expires_at": 1,
-    })
-    plain_client = TestClient(app)
-    assert plain_client.get(f"/api/satellite-image-access/{expired}").status_code == 404
-    assert plain_client.get(f"/api/satellite-image-access/{expired}x").status_code == 404
 
 
 def test_get_event_images_not_found(client):

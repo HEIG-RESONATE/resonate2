@@ -1,28 +1,18 @@
-import base64
-import binascii
-import hashlib
-import hmac
-import json
-import logging
 import os
 import re
-import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
+from urllib.parse import quote
 
 import filetype
 from fastapi import HTTPException
 from mongoengine.errors import ValidationError
 
-from auth import SECRET_KEY
 from models import Event
-
-logger = logging.getLogger(__name__)
 
 IMAGES_DIR = os.environ.get("IMAGES_DIR", "/app/images")
 ALLOWED_UPLOAD_TYPES = {"image/png", "image/jpeg"}
 MAX_UPLOAD_MB = 50
-IMAGE_ACCESS_TTL_SECONDS = 300
 
 
 def validate_upload(content: bytes, content_type: str | None) -> str:
@@ -122,39 +112,6 @@ def get_event_images(event_id: str) -> list:
     return ensure_image_ids(doc)
 
 
-def _access_ttl_seconds() -> int:
-    try:
-        configured = int(os.environ.get("IMAGE_ACCESS_TTL_SECONDS", IMAGE_ACCESS_TTL_SECONDS))
-    except ValueError:
-        configured = IMAGE_ACCESS_TTL_SECONDS
-    return min(max(configured, 1), 900)
-
-
-def _encode_access_token(payload: dict) -> str:
-    encoded = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).rstrip(b"=")
-    signature = hmac.new(
-        SECRET_KEY.encode(), b"satellite-image-access:v1." + encoded, hashlib.sha256
-    ).digest()
-    return f"{encoded.decode()}.{base64.urlsafe_b64encode(signature).rstrip(b'=').decode()}"
-
-
-def _decode_access_token(token: str) -> dict:
-    try:
-        encoded, provided_signature = token.split(".", 1)
-        expected_signature = hmac.new(
-            SECRET_KEY.encode(), f"satellite-image-access:v1.{encoded}".encode(), hashlib.sha256
-        ).digest()
-        actual_signature = base64.urlsafe_b64decode(provided_signature + "=" * (-len(provided_signature) % 4))
-        payload = json.loads(base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)))
-        if not hmac.compare_digest(expected_signature, actual_signature) or payload["expires_at"] <= time.time():
-            raise ValueError
-        if payload["variant"] not in {"preview", "original"}:
-            raise ValueError
-        return payload
-    except (KeyError, TypeError, ValueError, UnicodeDecodeError, json.JSONDecodeError, binascii.Error):
-        raise HTTPException(status_code=404, detail="Image not found")
-
-
 def get_image_for_event(event_id: str, image_id: str) -> tuple[Event, dict]:
     try:
         doc = Event.objects(id=event_id).first()
@@ -168,40 +125,19 @@ def get_image_for_event(event_id: str, image_id: str) -> tuple[Event, dict]:
     return doc, image
 
 
-def get_image_access(event_id: str, image_id: str, variant: str, base_url: str) -> dict:
+def get_image_access(event_id: str, image_id: str, variant: str) -> dict:
+    """Resolve an event image to its stable, UI-served overlay path."""
     _, image = get_image_for_event(event_id, image_id)
     filename = image.get("preview") if variant == "preview" else image.get("filename")
     if not filename:
         raise HTTPException(status_code=404, detail="Preview not available" if variant == "preview" else "Image not found")
 
-    expires_at = int(time.time()) + _access_ttl_seconds()
-    token = _encode_access_token({
-        "event_id": event_id,
-        "image_id": image_id,
-        "variant": variant,
-        "expires_at": expires_at,
-    })
     content_type = image.get("content_type") or "application/octet-stream"
     return {
         "image_id": image_id,
         "event_id": event_id,
         "variant": variant,
-        "url": f"{base_url.rstrip('/')}/api/satellite-image-access/{token}",
+        "url_path": f"/images/{quote(os.path.basename(filename), safe='')}",
         "filename": image.get("filename", "image"),
         "content_type": content_type,
-        "expires_at": datetime.fromtimestamp(expires_at, timezone.utc).isoformat().replace("+00:00", "Z"),
     }
-
-
-def resolve_signed_image(token: str) -> tuple[str, str]:
-    """Resolve a signed token to a local file without exposing storage paths."""
-    payload = _decode_access_token(token)
-    _, image = get_image_for_event(payload["event_id"], payload["image_id"])
-    filename = image.get("preview") if payload["variant"] == "preview" else image.get("filename")
-    if not filename:
-        raise HTTPException(status_code=404, detail="Image not found")
-    filepath = os.path.join(os.environ.get("IMAGES_DIR", IMAGES_DIR), os.path.basename(filename))
-    if not os.path.isfile(filepath):
-        logger.warning("Signed image access referenced a missing file")
-        raise HTTPException(status_code=404, detail="Image not found")
-    return filepath, image.get("content_type") or "application/octet-stream"

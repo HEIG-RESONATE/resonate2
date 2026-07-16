@@ -24,11 +24,9 @@ API --> Frontend: { status: "ok", image: {...} }
 
 Admin -> API: GET /api/events/{id}/satellite-images/{image_id}/access
 API -> DB: Confirm event/image ownership
-API -> API: Create short-lived signed access token
-API --> Admin: Opaque backend URL + expiry
-Admin -> API: GET /api/satellite-image-access/{token}
-API -> API: Validate token and expiry
+API --> Admin: Relative /images/{preview} path
+Admin -> API: GET /images/{preview}
 API -> Storage: Read preview/original
-API --> Admin: Browser-safe image response
+API --> Admin: Image response
 
 @enduml

@@ -1,7 +1,7 @@
 from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, UploadFile, File, Form, Query, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -163,17 +163,10 @@ def get_satellite_images(event_id: str, _=Depends(get_admin_token)):
 def get_satellite_image_access(
     event_id: str,
     image_id: str,
-    request: Request,
     variant: str = Query("preview", pattern="^(preview|original)$"),
     _=Depends(get_admin_token),
 ):
-    return image_service.get_image_access(event_id, image_id, variant, str(request.base_url))
-
-
-@app.get("/api/satellite-image-access/{token}")
-def serve_signed_satellite_image(token: str):
-    filepath, content_type = image_service.resolve_signed_image(token)
-    return FileResponse(filepath, media_type=content_type)
+    return image_service.get_image_access(event_id, image_id, variant)
 
 
 @app.get("/api/public/events", response_model=list[EventOut])
