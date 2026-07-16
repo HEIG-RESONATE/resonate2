@@ -119,6 +119,10 @@
           </div>
         </form>
 
+        <div class="admin-sort-controls">
+          <label>Sort by <select v-model="sortBy"><option value="date">Event date</option><option value="added">Date added</option></select></label>
+          <label>Order <select v-model="sortDirection"><option value="asc">Ascending</option><option value="desc">Descending</option></select></label>
+        </div>
         <table v-if="events.length" class="events-table">
           <thead>
             <tr>
@@ -130,7 +134,7 @@
           </thead>
           <tbody>
             <tr v-for="event in events" :key="event.id">
-              <td>{{ event.title }}</td>
+              <td>{{ event.title }} <span v-if="event.is_latest" class="new-badge">New!</span></td>
               <td>{{ new Date(event.date).toLocaleString() }}</td>
               <td>
                 <span v-if="event.points && event.points.coordinates">
@@ -193,6 +197,8 @@ const password = ref('')
 const authenticated = ref(false)
 const error = ref('')
 const events = ref([])
+const sortBy = ref('date')
+const sortDirection = ref('desc')
 const editing = ref(null)
 const showMapPicker = ref(false)
 const pickerPoints = ref([])
@@ -274,11 +280,14 @@ function validatePoints() {
 }
 
 async function loadEvents() {
-  const res = await fetch('/api/events', {
+  const query = new URLSearchParams({ sort_by: sortBy.value, direction: sortDirection.value })
+  const res = await fetch(`/api/events?${query}`, {
     headers: { 'Authorization': `Bearer ${sessionStorage.getItem('adminToken')}` },
   })
   events.value = await res.json()
 }
+
+watch([sortBy, sortDirection], loadEvents)
 
 function resetForm() {
   form.title = ''
@@ -1035,6 +1044,36 @@ body {
   box-shadow: var(--shadow);
   border-collapse: collapse;
   overflow: hidden;
+}
+
+.admin-sort-controls {
+  display: flex;
+  gap: 1rem;
+  margin: 1.5rem 0 0.75rem;
+}
+
+.admin-sort-controls label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.admin-sort-controls select {
+  padding: 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.new-badge {
+  display: inline-block;
+  background: #f7d354;
+  color: #17231d;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  vertical-align: middle;
 }
 
 .events-table th,

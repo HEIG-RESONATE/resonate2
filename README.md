@@ -88,6 +88,11 @@ cd frontend && npm run dev
 | `/api/events/{id}/satellite-images/{image_id}/access` | GET | JWT | Mint a short-lived URL for an image preview or original |
 | `/api/public/events` | GET | None | Public read-only |
 
+Event-list endpoints accept `sort_by=date|added` and `direction=asc|desc`. Each
+event includes its immutable `created_at` timestamp and `is_latest`, which is
+true only for the most recently added record. Existing records without a stored
+timestamp use their MongoDB ObjectId creation time.
+
 ### Event Schema
 
 ```json

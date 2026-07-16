@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import Depends, FastAPI, HTTPException, UploadFile, File, Form, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -8,7 +10,7 @@ import mongoengine
 import os
 
 from schemas import CarouselImage, EventCreate, EventOut, EventUpdate, LoginRequest, TokenResponse
-from models import Event
+from models import Event, backfill_legacy_created_at
 from auth import create_access_token, verify_password, admin_password, get_admin_token
 from services import events as event_service
 from services import images as image_service
@@ -21,6 +23,8 @@ if "default" not in mongoengine.connection._connections:
         host=MONGO_HOST,
         uuidRepresentation="pythonLegacy",
     )
+
+backfill_legacy_created_at()
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -45,8 +49,12 @@ def admin_login(request: Request, req: LoginRequest):
 
 
 @app.get("/api/events", response_model=list[EventOut])
-def list_events(_=Depends(get_admin_token)):
-    return event_service.list_events()
+def list_events(
+    sort_by: Literal["date", "added"] = "date",
+    direction: Literal["asc", "desc"] = "desc",
+    _=Depends(get_admin_token),
+):
+    return event_service.list_events(sort_by=sort_by, direction=direction)
 
 
 @app.get("/api/events/{event_id}", response_model=EventOut)
@@ -169,5 +177,8 @@ def serve_signed_satellite_image(token: str):
 
 
 @app.get("/api/public/events", response_model=list[EventOut])
-def list_events_public():
-    return event_service.list_events()
+def list_events_public(
+    sort_by: Literal["date", "added"] = "date",
+    direction: Literal["asc", "desc"] = "asc",
+):
+    return event_service.list_events(sort_by=sort_by, direction=direction)

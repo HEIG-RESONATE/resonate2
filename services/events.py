@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException
@@ -47,7 +47,20 @@ def format_news(news) -> Optional[list]:
     return [{"title": item.title, "url": item.url, "author": item.author, "extra": item.extra} for item in news]
 
 
-def doc_to_event_out(doc: Event) -> EventOut:
+def created_at(doc: Event) -> datetime:
+    """Return a stable insertion timestamp, including for legacy documents."""
+    value = doc.created_at
+    if value is None:
+        return doc.id.generation_time
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
+def timestamp(value: datetime) -> float:
+    """Normalize naive legacy dates before using them as sort keys."""
+    return (value if value.tzinfo else value.replace(tzinfo=timezone.utc)).timestamp()
+
+
+def doc_to_event_out(doc: Event, *, is_latest: bool = False) -> EventOut:
     # Legacy and API-supplied image metadata is normalized on read so every
     # satellite image has an opaque ID before it is returned to a client.
     from services.images import ensure_image_ids
@@ -56,6 +69,8 @@ def doc_to_event_out(doc: Event) -> EventOut:
         id=str(doc.id),
         title=doc.title,
         date=doc.date.isoformat(),
+        created_at=created_at(doc).isoformat(),
+        is_latest=is_latest,
         points=format_points(doc.points),
         extra=doc.extra,
         images=ensure_image_ids(doc),
@@ -71,9 +86,18 @@ def get_event_or_404(event_id: str) -> Event:
     return doc
 
 
-def list_events() -> list[EventOut]:
-    docs = Event.objects().order_by("-date")
-    return [doc_to_event_out(doc) for doc in docs]
+def list_events(sort_by: str = "date", direction: str = "desc") -> list[EventOut]:
+    docs = list(Event.objects())
+    if not docs:
+        return []
+
+    latest = max(docs, key=lambda doc: (timestamp(created_at(doc)), str(doc.id)))
+    primary_key = (lambda doc: doc.date) if sort_by == "date" else created_at
+    docs.sort(
+        key=lambda doc: (timestamp(primary_key(doc)), timestamp(created_at(doc)), str(doc.id)),
+        reverse=direction == "desc",
+    )
+    return [doc_to_event_out(doc, is_latest=doc.id == latest.id) for doc in docs]
 
 
 def get_event(event_id: str) -> EventOut:
@@ -92,6 +116,7 @@ def create_event(title: str, date: str, points=None, extra=None, images=None, ca
     doc = Event(
         title=title,
         date=parsed_date,
+        created_at=datetime.now(timezone.utc),
         points=normalized_points,
         extra=extra,
         images=images or [],

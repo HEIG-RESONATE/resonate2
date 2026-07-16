@@ -41,6 +41,32 @@ def test_list_events(client):
     assert len(events) >= 1
 
 
+def test_list_events_can_sort_by_added_time_and_identify_latest(client):
+    """Added order is independent from the event's chronological date."""
+    first = client.post("/api/events", json={
+        "title": "Added first",
+        "date": "2030-01-01T00:00:00",
+    }).json()
+    second = client.post("/api/events", json={
+        "title": "Added second",
+        "date": "2020-01-01T00:00:00",
+    }).json()
+
+    descending = client.get("/api/events?sort_by=added&direction=desc")
+    ascending = client.get("/api/events?sort_by=added&direction=asc")
+    chronological_ascending = client.get("/api/events?sort_by=date&direction=asc")
+    chronological_descending = client.get("/api/events?sort_by=date&direction=desc")
+
+    assert descending.status_code == 200
+    assert [event["id"] for event in descending.json()[:2]] == [second["id"], first["id"]]
+    assert [event["id"] for event in ascending.json()[:2]] == [first["id"], second["id"]]
+    assert descending.json()[0]["is_latest"] is True
+    assert descending.json()[1]["is_latest"] is False
+    assert descending.json()[0]["created_at"]
+    assert [event["id"] for event in chronological_ascending.json()[:2]] == [second["id"], first["id"]]
+    assert [event["id"] for event in chronological_descending.json()[:2]] == [first["id"], second["id"]]
+
+
 def test_update_event(client):
     """Test updating an event."""
     payload = {

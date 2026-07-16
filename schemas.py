@@ -64,6 +64,8 @@ class EventOut(BaseModel):
     id: str
     title: str
     date: str
+    created_at: str
+    is_latest: bool = False
     points: Optional[GeoJSONMultiPoint] = None
     extra: Optional[dict] = None
     images: Optional[list] = None

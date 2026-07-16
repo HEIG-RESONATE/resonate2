@@ -28,7 +28,7 @@
         <div class="timeline-viewport">
           <div v-if="filteredEvents.length > 0" class="timeline-track" :style="{ transform: `translateX(${trackOffset}px)` }">
             <button
-              v-for="(event, index) in filteredEvents"
+              v-for="(event, index) in timelineEvents"
               :key="event.id"
               class="timeline-item"
               :class="{ active: selectedEvent?.id === event.id }"
@@ -194,11 +194,15 @@
 
       <template v-else>
         <h2 class="sidebar-title">Events</h2>
+        <div class="event-sort-controls">
+          <label>Sort by <select v-model="sortBy"><option value="date">Event date</option><option value="added">Date added</option></select></label>
+          <label>Order <select v-model="sortDirection"><option value="asc">Ascending</option><option value="desc">Descending</option></select></label>
+        </div>
         <div v-if="loading" class="loading">Loading...</div>
         <div v-else-if="events.length === 0" class="empty">No events yet</div>
         <ul v-else class="event-list">
           <li v-for="event in filteredEvents" :key="event.id" class="event-item" @click="selectEvent(event)">
-            <span class="event-title">{{ event.title }}</span>
+            <span class="event-title">{{ event.title }} <span v-if="event.is_latest" class="new-badge">New!</span></span>
             <span class="event-date">{{ formatDate(event.date) }}</span>
           </li>
         </ul>
@@ -295,6 +299,8 @@ let chatRefreshInterval = null
 
 const filterFrom = ref('')
 const filterTo = ref('')
+const sortBy = ref('date')
+const sortDirection = ref('asc')
 const chatUrl = import.meta.env.VITE_CHAINLIT_URL || DEFAULT_CHAT_URL
 const chatOrigin = (() => {
   try {
@@ -374,6 +380,8 @@ const filteredEvents = computed(() => {
   })
 })
 
+const timelineEvents = computed(() => [...filteredEvents.value].sort((a, b) => new Date(a.date) - new Date(b.date)))
+
 const trackOffset = computed(() => {
   const viewportWidth = ITEM_WIDTH * VISIBLE_COUNT
   const centerOffset = viewportWidth / 2 - ITEM_WIDTH / 2
@@ -382,6 +390,11 @@ const trackOffset = computed(() => {
 
 watch(filterFrom, () => { activeIndex.value = 0; refreshMarkers() })
 watch(filterTo, () => { activeIndex.value = 0; refreshMarkers() })
+watch([sortBy, sortDirection], async () => {
+  activeIndex.value = 0
+  await loadEvents()
+  refreshMarkers()
+})
 watch(chatOpen, (isOpen) => {
   if (isOpen) {
     refreshEvents()
@@ -392,9 +405,10 @@ watch(chatOpen, (isOpen) => {
 })
 
 async function loadEvents() {
-  const res = await fetch('/api/public/events')
+  const query = new URLSearchParams({ sort_by: sortBy.value, direction: sortDirection.value })
+  const res = await fetch(`/api/public/events?${query}`)
   const data = await res.json()
-  events.value = data.sort((a, b) => new Date(a.date) - new Date(b.date))
+  events.value = data
 }
 
 async function refreshEvents() {
@@ -605,7 +619,7 @@ function toggleRaster(img) {
 }
 
 function playTimeline() {
-  if (filteredEvents.value.length < 2) return
+  if (timelineEvents.value.length < 2) return
 
   if (isPlaying.value) {
     stopTimeline()
@@ -617,7 +631,7 @@ function playTimeline() {
   selectFilteredEvent(0)
 
   playInterval = setInterval(() => {
-    activeIndex.value = (activeIndex.value + 1) % filteredEvents.value.length
+    activeIndex.value = (activeIndex.value + 1) % timelineEvents.value.length
     selectFilteredEvent(activeIndex.value)
   }, 3000)
 }
@@ -632,22 +646,22 @@ function stopTimeline() {
 
 function prevEvent() {
   stopTimeline()
-  if (filteredEvents.value.length === 0) return
+  if (timelineEvents.value.length === 0) return
   activeIndex.value = activeIndex.value > 0
     ? activeIndex.value - 1
-    : filteredEvents.value.length - 1
+    : timelineEvents.value.length - 1
   selectFilteredEvent(activeIndex.value)
 }
 
 function nextEvent() {
   stopTimeline()
-  if (filteredEvents.value.length === 0) return
-  activeIndex.value = (activeIndex.value + 1) % filteredEvents.value.length
+  if (timelineEvents.value.length === 0) return
+  activeIndex.value = (activeIndex.value + 1) % timelineEvents.value.length
   selectFilteredEvent(activeIndex.value)
 }
 
 function selectFilteredEvent(index) {
-  const event = filteredEvents.value[index]
+  const event = timelineEvents.value[index]
   if (event) {
     activeIndex.value = index
     selectedEvent.value = event
@@ -1581,6 +1595,26 @@ html, body {
   margin: 0;
 }
 
+.event-sort-controls {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0 1rem 0.75rem;
+}
+
+.event-sort-controls label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.event-sort-controls select {
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  color: inherit;
+  padding: 0.3rem;
+}
+
 .event-item {
   padding: 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.3);
@@ -1603,6 +1637,17 @@ html, body {
   display: block;
   font-size: 0.8rem;
   opacity: 0.9;
+}
+
+.new-badge {
+  display: inline-block;
+  background: #f7d354;
+  color: #17231d;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  vertical-align: middle;
 }
 
 .lightbox {
