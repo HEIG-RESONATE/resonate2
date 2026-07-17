@@ -237,6 +237,7 @@
             class="chat-frame"
             :src="chatUrl"
             title="Agent chat"
+            allow="clipboard-write"
             referrerpolicy="strict-origin-when-cross-origin"
           ></iframe>
         </aside>
