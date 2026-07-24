@@ -40,6 +40,11 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     )
 
 
+@app.get("/api/health")
+def health():
+    return {"status": "ok"}
+
+
 @app.post("/api/admin/login", response_model=TokenResponse)
 @limiter.limit("15/minute")
 def admin_login(request: Request, req: LoginRequest):

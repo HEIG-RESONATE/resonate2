@@ -270,7 +270,9 @@ const ITEM_WIDTH = 120
 const VISIBLE_COUNT = 5
 const CHAT_REFRESH_EVENT = 'resonate:refresh'
 const CHAT_REFRESH_POLL_MS = 15000
-const DEFAULT_CHAT_URL = 'http://localhost:8001'
+// Same-origin path proxied to the agent by nginx (see nginx.conf). Override
+// with VITE_CHAINLIT_URL only for local development outside Docker.
+const DEFAULT_CHAT_URL = '/chat/'
 
 const events = ref([])
 const loading = ref(true)

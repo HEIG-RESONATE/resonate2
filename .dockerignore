@@ -1,0 +1,23 @@
+.git
+.gitignore
+.env
+.env.example
+.venv
+__pycache__
+*.pyc
+node_modules
+.htpasswd
+.dockerignore
+Dockerfile
+docker-compose.yml
+
+# The frontend has its own build context
+frontend/
+
+# Not needed at runtime
+tests/
+docs/
+.coverage
+.pytest_cache
+*.egg-info
+.DS_Store

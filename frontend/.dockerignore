@@ -1,0 +1,15 @@
+.git
+.gitignore
+.env
+.venv
+__pycache__
+*.pyc
+node_modules
+.htpasswd
+.dockerignore
+Dockerfile
+dist
+cypress/
+cypress.config.js
+nginx.conf.bak
+.DS_Store
